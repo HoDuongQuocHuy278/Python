@@ -1,21 +1,41 @@
 from flask import (
     Flask, render_template, redirect, url_for, flash,
+
     request, session, abort, send_from_directory, jsonify
+
 )
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed, FileRequired
+
 from wtforms import (
     StringField, PasswordField, SubmitField, SelectField, HiddenField,
     DecimalField, TextAreaField
 )
+
 from pathlib import Path
 import os
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
 from flask_wtf.file import FileField, FileAllowed
-from werkzeug.security import generate_password_hash, check_password_hash
+
+from wtforms.validators import (
+    DataRequired, Email, Length, EqualTo, NumberRange, Optional
+)
+
+
+from flask_wtf.file import FileField, FileAllowed
+from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
+
+
+import os, time
+from decimal import Decimal
+from pathlib import Path
+
 import mysql.connector
 from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
+
 from openai import OpenAI
 from decimal import Decimal
 from dotenv import load_dotenv
@@ -58,6 +78,7 @@ def get_conn():
 # =========================================================
 # Chatbot API
 # =========================================================
+app = Flask(__name__)
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
     try:
@@ -81,7 +102,82 @@ def chatbot():
 
 
 
+
+
 # ===================== App & Config =====================
+
+
+from pathlib import Path
+from tempfile import gettempdir
+
+
+def ensure_media_root():
+    candidates = [
+        Path(app.instance_path) / "uploads",
+        Path(app.root_path) / "media",
+        Path(gettempdir()) / "traodoi_uploads",
+    ]
+    for p in candidates:
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            t = p / ".write_test"
+            t.write_bytes(b"ok")
+            t.unlink(missing_ok=True)
+            app.config["MEDIA_ROOT"] = str(p)
+            print("MEDIA_ROOT =>", app.config["MEDIA_ROOT"])
+            return p
+        except Exception as e:
+            print("MEDIA candidate failed:", p, "=>", e)
+    raise RuntimeError("No writable MEDIA_ROOT found")
+
+MEDIA_DIR = ensure_media_root()
+ALLOWED_EXTS = ["jpg","jpeg","png","webp"]
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5MB
+
+MEDIA_DIR = ensure_media_root()
+
+def _save_image(file_storage):
+    """
+    Lưu file vào MEDIA_ROOT và trả về CHỈ tên file (vd: '5_1726722333.jpg').
+    Trả None nếu không có file hoặc định dạng không hợp lệ.
+    """
+    if not file_storage or not getattr(file_storage, "filename", ""):
+        return None
+
+    filename = secure_filename(file_storage.filename)
+    if "." not in filename:
+        flash("File ảnh không hợp lệ.", "warning")
+        return None
+
+    ext = filename.rsplit(".", 1)[-1].lower()
+    if ext not in ALLOWED_EXTS:
+        flash("Định dạng ảnh không hỗ trợ. Chỉ jpg, jpeg, png, webp.", "warning")
+        return None
+
+    root = Path(app.config["MEDIA_ROOT"])
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # fallback lại nếu thư mục bị xóa khi đang chạy
+        root = ensure_media_root()
+
+    new_name = f"{session['user']['id']}_{int(time.time())}.{ext}"
+    target = root / new_name
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        try: file_storage.stream.seek(0, os.SEEK_SET)
+        except Exception: pass
+        print("Saving to:", target, "| parent exists?", target.parent.exists())
+        with open(target, "wb") as f:
+            f.write(file_storage.read())
+    except Exception as e:
+        print("SAVE ERROR:", e)
+        flash("Không thể lưu ảnh lên máy chủ.", "danger")
+        return None
+
+    return new_name
+
 
 app.config["SECRET_KEY"] = "dev-secret-key-change-me"  # Đổi khi deploy
 # Một số bảo vệ session cơ bản
@@ -90,15 +186,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
-from pathlib import Path
-BASE_DIR = Path(app.root_path)
-INSTANCE_DIR = Path(app.instance_path)
-MEDIA_DIR = INSTANCE_DIR / "uploads"
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-app.config["MEDIA_ROOT"] = str(MEDIA_DIR)
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
-ALLOWED_EXTS = ["jpg","jpeg","png","webp"]
 
 
 # ===================== MySQL (XAMPP) =====================
@@ -129,7 +217,6 @@ CONDITIONS = [
     ("for_parts","Hỏng/để lấy linh kiện"),
 ]
 # Nếu chưa có biến ALLOWED_EXTS ở phần cấu hình upload, thêm:
-ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"]
 class RegisterForm(FlaskForm):
     fullname = StringField("Họ và tên", validators=[DataRequired(), Length(min=2, max=50)])
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=100)])
@@ -194,12 +281,15 @@ def roles_required(*allowed_roles):
 
 @app.context_processor
 def inject_user():
+    
     u = session.get("user")
     def media_url(name):
         import os
         if not name: return None
         return url_for("uploaded_file", filename=os.path.basename(name))
     return dict(current_user=u, is_logged_in=bool(u), media_url=media_url)
+
+
 
 # ===================== Routes cơ bản =====================
 @app.route("/")
@@ -390,8 +480,7 @@ def admin_user_delete(uid):
 
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    from flask import send_from_directory
-    return send_from_directory(app.config["MEDIA_ROOT"], filename)
+    return send_from_directory(app.config["MEDIA_ROOT"], filename, as_attachment=False)
 # ===================== Error handlers =====================
 @app.errorhandler(403)
 def forbidden(_):
@@ -406,9 +495,10 @@ def not_found(_):
 @login_required
 def sell():
     """
-    Trang đăng bán sản phẩm.
-    - Yêu cầu đăng nhập (login_required)
-    - Xử lý form: lưu ảnh bìa (nếu có), insert DB, rồi chuyển về /my/listings
+    Trang đăng bán sản phẩm:
+    - Validate form
+    - Lưu ảnh về instance/uploads (trả về tên file)
+    - Ghi DB
     """
     form = SellForm()
 
@@ -416,15 +506,16 @@ def sell():
         # Lấy dữ liệu form
         title = form.title.data.strip()
         description = form.description.data.strip()
-        # Ép giá về Decimal, chấp nhận người dùng nhập có dấu phẩy
+
+        # Ép giá về Decimal (nhận cả '3,500,000')
+        from decimal import Decimal, InvalidOperation
         try:
-            from decimal import Decimal
             price = (
                 Decimal(form.price.data)
                 if isinstance(form.price.data, (int, float, Decimal))
                 else Decimal(str(form.price.data).replace(",", "").strip())
             )
-        except Exception:
+        except (InvalidOperation, ValueError):
             flash("Giá không hợp lệ.", "warning")
             return render_template("sell.html", form=form)
 
@@ -432,16 +523,20 @@ def sell():
         condition_level = form.condition_level.data
         location = (form.location.data or "").strip() or None
 
-        # Lưu ảnh bìa (trả về tên file hoặc None)
-        try:
-            cover_path = _save_image(form.image.data)
-        except Exception:
-            cover_path = None
+        # LƯU ẢNH BÌA — chỉ gọi MỘT lần
+        cover_path = _save_image(form.image.data)
+        print("MEDIA_ROOT =", app.config["MEDIA_ROOT"])
+        print("filename  ->", getattr(form.image.data, "filename", None))
+        print("saved as  ->", cover_path)
+
+        # Debug kiểm tra nhanh
+        print("MEDIA_ROOT =", app.config["MEDIA_ROOT"])
+        print("filename  ->", getattr(form.image.data, "filename", None))
+        print("saved as  ->", cover_path)
 
         # Ghi DB
         try:
             with closing(get_conn()) as conn:
-                # đảm bảo charset cho MySQL
                 try:
                     conn.set_charset_collation('utf8mb4', 'utf8mb4_unicode_ci')
                 except Exception:
@@ -458,11 +553,11 @@ def sell():
                             session["user"]["id"],
                             title,
                             description,
-                            str(price),            # lưu Decimal dưới dạng chuỗi số
+                            str(price),
                             category,
                             condition_level,
                             location,
-                            cover_path,            # chỉ tên file nếu dùng instance/uploads
+                            cover_path,  # tên file (có thể None nếu không chọn ảnh)
                         ),
                     )
                     conn.commit()
@@ -479,8 +574,6 @@ def sell():
 
     # GET hoặc lỗi -> render lại form
     return render_template("sell.html", form=form)
-
-
 @app.route("/my/listings")
 @login_required
 def my_listings():
