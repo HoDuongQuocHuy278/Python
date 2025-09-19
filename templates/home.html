@@ -3,61 +3,85 @@
 
 {% block extra_head %}
 <style>
-  body { margin:0; background:#f9f9f9 }
-  /* Top bar */
-  .top-bar{background:#2e7d32;color:#fff;display:flex;justify-content:space-between;padding:6px 15px;font-size:14px}
-  /* Nav */
-  .navbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.08)}
-  .navbar .logo{font-size:26px;font-weight:800;color:#2e7d32;text-decoration:none;white-space:nowrap}
-  .navbar .search{width:40%;display:flex;gap:8px;align-items:center}
-  .navbar .search input{flex:1;padding:10px 14px;border:1px solid #dcdcdc;border-radius:20px;outline:none}
-  .nav-links{display:flex;gap:16px;align-items:center}
-  .nav-links a{color:#333;text-decoration:none;font-size:15px}
-  .btn-sell{background:#2e7d32;color:#fff !important;padding:8px 16px;border-radius:18px;font-weight:600;text-decoration:none}
-
-  /* Banner */
-  .container{max-width:1200px;margin:0 auto;padding:0 16px}
-  .banner img{width:100%;display:block;border-radius:10px;margin:16px 0}
-
-  /* Categories */
-  .categories{padding:20px;background:#fff;margin:16px;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,.06)}
-  .categories h2{margin:0 0 12px;color:#2e7d32}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:18px}
-  .item{text-align:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px}
-  .item:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.06)}
-  .item img{width:90px;height:90px;object-fit:cover;border-radius:10px;display:block;margin:0 auto 8px}
-
-  /* Footer */
-  footer{text-align:center;padding:16px;background:#2e7d32;color:#fff;margin-top:30px}
+  /* Hero + các card */
+  .hero-box{
+    background: linear-gradient(135deg,#ffe3d9 0%, #ffffff 55%);
+    border: 1px solid #eee; border-radius:16px; padding:24px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.06);
+  }
+  .side-card{
+    background:#fff; border:1px solid #eee; border-radius:14px;
+    padding:16px; box-shadow:0 6px 18px rgba(0,0,0,.05);
+  }
+  /* Danh mục */
+  .cat-card{
+    background:#fff; border:1px solid #eef0f3; border-radius:14px; padding:16px;
+    text-align:center; text-decoration:none; color:#1f2937; height:100%;
+    transition: transform .15s ease, box-shadow .15s ease;
+    box-shadow:0 8px 22px rgba(2,12,27,.06);
+  }
+  .cat-card:hover{ transform: translateY(-2px); box-shadow:0 16px 30px rgba(2,12,27,.12); }
+  .cat-ico{ font-size:32px; line-height:1; }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="container py-3">
 
-<main class="container">
-  <!-- Banner -->
-  <section class="banner">
-    <img src="https://via.placeholder.com/1200x300?text=Khuyen+Mai+-+Trao+doi+do+cu" alt="Banner">
-  </section>
-
-  <!-- Danh mục -->
-  <section class="categories">
-    <h2>Danh mục nổi bật</h2>
-    <div class="grid">
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Sách</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thời trang nữ</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thời trang nam</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Mẹ &amp; bé</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ chơi</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Xe cộ</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ gia dụng</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Giày dép</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ điện tử</p></a>
-      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thú cưng</p></a>
+  <!-- HERO: Banner + 2 thẻ cam kết -->
+  <div class="row g-3 align-items-stretch">
+    <div class="col-lg-9">
+      <div class="hero-box h-100">
+        <h3 class="fw-bold mb-2">“DỌN NHÀ” THÔNG MINH – RINH NGÀN ƯU ĐÃI</h3>
+        <p class="text-muted mb-3">Hoàn 100% phí bán hàng · Giao dịch miễn phí · Nhiều voucher hấp dẫn</p>
+        <a class="btn btn-success" href="{{ url_for('profile') if is_logged_in else url_for('login') }}">+ Đăng bán ngay</a>
+      </div>
     </div>
-  </section>
-</main>
+    <div class="col-lg-3">
+      <div class="side-card mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <span>✅</span>
+          <div>
+            <div class="fw-semibold">Nhận sản phẩm như mô tả</div>
+            <div class="text-muted small">Hoặc nhận tiền hoàn</div>
+          </div>
+        </div>
+      </div>
+      <div class="side-card">
+        <div class="d-flex align-items-center gap-2">
+          <span>📱</span>
+          <div>
+            <div class="fw-semibold">Mua bán thuận tiện</div>
+            <div class="text-muted small">Quét QR để tải app</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
+  <!-- DANH MỤC -->
+  <div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h4 class="m-0">Danh mục nổi bật</h4>
+      <a href="#" class="text-decoration-none">Xem tất cả</a>
+    </div>
 
+    <div class="row g-3">
+      {% set cats = [
+        ('📚','Sách'), ('👗','Thời trang nữ'), ('👕','Thời trang nam'), ('🍼','Mẹ & Bé'),
+        ('🧸','Đồ chơi'), ('🚗','Xe cộ'), ('🏠','Đồ gia dụng'), ('👟','Giày dép'),
+        ('💻','Đồ điện tử'), ('🐶','Thú cưng')
+      ] %}
+      {% for icon, name in cats %}
+      <div class="col-6 col-md-4 col-lg-2">
+        <a class="cat-card d-block text-reset" href="#">
+          <div class="cat-ico">{{ icon }}</div>
+          <div class="fw-semibold mt-1">{{ name }}</div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 
+</div>
 {% endblock %}

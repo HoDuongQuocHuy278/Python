@@ -40,6 +40,16 @@
     .tdc-subnav a{color:#fff;text-decoration:none;opacity:.95}
     .tdc-subnav a:hover{opacity:1;text-decoration:underline}
 
+    /* ========= Footer ========= */
+    .tdc-footer{background:#fff;border-top:3px solid #ff7337;}
+    .tdc-footer .container{padding:32px 0}
+    .tdc-footer h6{font-weight:700;color:#111;margin-bottom:12px}
+    .tdc-footer a{color:#475467;text-decoration:none;display:block;margin:6px 0}
+    .tdc-footer a:hover{color:#000;text-decoration:underline}
+    .tdc-footer .app-badges img{height:36px;margin-right:8px}
+    .tdc-footbar{background:#0b0b0c;color:#fff}
+    .tdc-footbar .container{display:flex;justify-content:space-between;gap:12px;padding:10px 0;font-size:14px;flex-wrap:wrap}
+    
     /* Flash messages spacing */
     .flash-wrap { padding: 12px 0; }
     @media (max-width: 992px){ .tdc-actions .tdc-aux{display:none} }
@@ -141,6 +151,67 @@
   <main id="main">
     {% block content %}{% endblock %}
   </main>
+  {% block footer %}
+<footer class="tdc-footer">
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-12 col-md-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div style="border:2px solid #ff7337;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <i class="fa-solid fa-recycle" style="color:#ff7337"></i>
+          </div>
+          <span class="fs-5 fw-bold">Trao đổi đồ cũ</span>
+        </div>
+        <p class="text-muted mb-2">Nền tảng mua bán, trao đổi đồ đã qua sử dụng – nhanh, an toàn, thân thiện môi trường.</p>
+        <div class="d-flex gap-2">
+          <a class="text-body-secondary" href="#"><i class="fa-brands fa-facebook fa-lg"></i></a>
+          <a class="text-body-secondary" href="#"><i class="fa-brands fa-instagram fa-lg"></i></a>
+          <a class="text-body-secondary" href="#"><i class="fa-brands fa-tiktok fa-lg"></i></a>
+          <a class="text-body-secondary" href="#"><i class="fa-brands fa-youtube fa-lg"></i></a>
+        </div>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <h6>Về chúng tôi</h6>
+        <a href="#">Giới thiệu</a>
+        <a href="#">Điều khoản sử dụng</a>
+        <a href="#">Chính sách bảo mật</a>
+        <a href="#">Tuyển dụng</a>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <h6>Hỗ trợ</h6>
+        <a href="#">Trung tâm trợ giúp</a>
+        <a href="#">Hướng dẫn mua hàng</a>
+        <a href="#">Hướng dẫn bán hàng</a>
+        <a href="#">Liên hệ hỗ trợ</a>
+        {% if is_logged_in and current_user.role == 'admin' %}
+          <a href="{{ url_for('admin_users') }}">Quản lý người dùng</a>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-md-3">
+        <h6>Tải ứng dụng</h6>
+        <div class="app-badges d-flex flex-wrap align-items-center">
+          <img src="https://static-00.iconduck.com/assets.00/google-play-badge-icon-512x152-4rdkh0f1.png" alt="Google Play">
+          <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" style="height:32px">
+        </div>
+        {% if is_logged_in %}
+          <div class="mt-3 small text-muted">Đang đăng nhập: {{ current_user.email }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="tdc-footbar">
+    <div class="container">
+      <div>© 2025 Trao đổi đồ cũ</div>
+      <div class="text-white-50">Made with Flask · <a class="text-white text-decoration-underline" href="{{ url_for('home') }}">Trang chủ</a></div>
+    </div>
+  </div>
+</footer>
+{% endblock %}
+
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   {% block scripts %}{% endblock %}
