@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Quản lý người dùng{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Người dùng</h3>
+  <form class="d-flex" method="get" action="{{ url_for('admin_users') }}">
+    <input class="form-control me-2" type="search" name="q" placeholder="Tìm tên hoặc email" value="{{ q or '' }}">
+    <button class="btn btn-outline-primary" type="submit"><i class="fa fa-search me-1"></i>Tìm</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>ID</th><th>Họ tên</th><th>Email</th><th>Role</th><th>Ngày tạo</th><th class="text-end">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in rows %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.fullname }}</td>
+          <td>{{ u.email }}</td>
+          <td><span class="badge text-bg-secondary">{{ u.role }}</span></td>
+          <td>{{ u.created_at }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_user_view', uid=u.id) }}"><i class="fa fa-eye"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_user_edit', uid=u.id) }}"><i class="fa fa-pen"></i></a>
+            <form method="post" action="{{ url_for('admin_user_delete', uid=u.id) }}" class="d-inline"
+                  onsubmit="return confirm('Xoá người dùng này?');">
+              {{ del_form.hidden_tag() }}
+              <input type="hidden" name="uid" value="{{ u.id }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted">Không có dữ liệu.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Trang chủ{% endblock %}
+
+{% block content %}
+<!-- HERO -->
+<section class="hero-box mb-4">
+  <div class="row align-items-center">
+    <div class="col-lg-8">
+      <h1 class="display-6 fw-bold mb-2 text-white">
+        Chào {{ current_user.fullname if current_user else "bạn" }} 👋
+      </h1>
+      <p class="lead text-white-50 mb-3">
+        Chúc bạn một ngày làm việc hiệu quả! Đây là bảng điều khiển nhanh của bạn.
+      </p>
+      <div class="d-flex flex-wrap gap-2">
+        {% if is_logged_in %}
+          <a class="btn btn-light btn-lg" href="{{ url_for('profile') }}">
+            <i class="fa-regular fa-user me-2"></i>Hồ sơ
+          </a>
+          {% if current_user.role in ['staff','admin'] %}
+          <a class="btn btn-outline-light btn-lg" href="{{ url_for('staff_area') }}">
+            <i class="fa-solid fa-people-group me-2"></i>Nhân viên
+          </a>
+          {% endif %}
+          {% if current_user.role == 'admin' %}
+          <a class="btn btn-outline-light btn-lg" href="{{ url_for('admin_users') }}">
+            <i class="fa-solid fa-users-gear me-2"></i>Quản lý người dùng
+          </a>
+          {% endif %}
+        {% else %}
+          <a class="btn btn-light btn-lg" href="{{ url_for('login') }}"><i class="fa-solid fa-right-to-bracket me-2"></i>Đăng nhập</a>
+          <a class="btn btn-outline-light btn-lg" href="{{ url_for('register') }}"><i class="fa-regular fa-id-card me-2"></i>Đăng ký</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4 d-none d-lg-block">
+      <div class="hero-blob"></div>
+    </div>
+  </div>
+</section>
+
+<!-- THÔNG TIN CƠ BẢN -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center">
+        <div class="stat-icon me-3"><i class="fa-regular fa-envelope"></i></div>
+        <div>
+          <div class="text-muted small">Email</div>
+          <div class="fw-semibold">{{ current_user.email }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center">
+        <div class="stat-icon me-3"><i class="fa-solid fa-shield-halved"></i></div>
+        <div>
+          <div class="text-muted small">Quyền</div>
+          <span class="badge rounded-pill bg-dark-subtle text-dark fw-semibold">{{ current_user.role|upper }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center">
+        <div class="stat-icon me-3"><i class="fa-regular fa-clock"></i></div>
+        <div>
+          <div class="text-muted small">Trạng thái</div>
+          <div class="fw-semibold">Đang hoạt động</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KHU VỰC THEO ROLE -->
+{% if current_user.role == 'admin' %}
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-transparent d-flex align-items-center">
+    <i class="fa-solid fa-crown me-2"></i> Khu vực Admin
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <a class="quick-card" href="{{ url_for('admin_users') }}">
+          <i class="fa-solid fa-users-gear"></i>
+          <span>Quản lý người dùng</span>
+        </a>
+      </div>
+      <div class="col-md-4">
+        <a class="quick-card" href="{{ url_for('admin_dashboard') }}">
+          <i class="fa-solid fa-chart-simple"></i>
+          <span>Dashboard quản trị</span>
+        </a>
+      </div>
+      <div class="col-md-4">
+        <a class="quick-card" href="{{ url_for('staff_area') }}">
+          <i class="fa-solid fa-user-tie"></i>
+          <span>Khu vực nhân viên</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% elif current_user.role == 'staff' %}
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-transparent d-flex align-items-center">
+    <i class="fa-solid fa-briefcase me-2"></i> Công cụ dành cho Nhân viên
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <a class="quick-card" href="{{ url_for('staff_area') }}">
+          <i class="fa-solid fa-list-check"></i>
+          <span>Tác vụ nội bộ</span>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a class="quick-card" href="{{ url_for('profile') }}">
+          <i class="fa-regular fa-user"></i>
+          <span>Thông tin cá nhân</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-transparent d-flex align-items-center">
+    <i class="fa-regular fa-face-smile me-2"></i> Gợi ý cho bạn
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <a class="quick-card" href="{{ url_for('profile') }}">
+          <i class="fa-regular fa-id-badge"></i>
+          <span>Cập nhật hồ sơ</span>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a class="quick-card" href="{{ url_for('logout') }}">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Đăng xuất</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

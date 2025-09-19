@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-5">
+    <div class="card shadow-lg border-0 glassy-card">
+      <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+          <div class="icon-circle mb-3"><i class="fa-solid fa-right-to-bracket fa-lg"></i></div>
+          <h1 class="h3 fw-bold mb-1">Đăng nhập</h1>
+          <p class="text-muted mb-0">Chào mừng quay lại</p>
+        </div>
+
+        <!-- Flash gần form -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}" novalidate>
+          {{ form.hidden_tag() }}
+
+          <!-- Email -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="fa-regular fa-envelope me-2"></i>Email
+            </label>
+            {{ form.email(
+                class_="form-control form-control-lg " + ("is-invalid" if form.email.errors else ""),
+                autocomplete="email",
+                autofocus=True,
+                placeholder="you@example.com"
+            ) }}
+            {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+          </div>
+
+          <!-- Password -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="fa-solid fa-lock me-2"></i>Mật khẩu
+            </label>
+            <div class="input-group input-group-lg">
+              {{ form.password(
+                  class_="form-control " + ("is-invalid" if form.password.errors else ""),
+                  id="pw",
+                  autocomplete="current-password",
+                  placeholder="Mật khẩu"
+              ) }}
+              <button class="btn btn-outline-secondary" type="button" onclick="togglePw('pw', this)" aria-label="Hiện/ẩn mật khẩu">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+            {% for e in form.password.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          </div>
+
+          <!-- Remember me (tùy chọn) -->
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" name="remember" id="remember">
+            <label class="form-check-label" for="remember">Ghi nhớ đăng nhập</label>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-lg gradient-btn" type="submit">
+              <i class="fa-solid fa-right-to-bracket me-2"></i>{{ form.submit.label.text }}
+            </button>
+          </div>
+        </form>
+
+        <div class="text-center mt-3">
+          <a href="{{ url_for('register') }}">Chưa có tài khoản? Đăng ký</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function togglePw(id, btn) {
+    const el = document.getElementById(id);
+    const icon = btn.querySelector('i');
+    if (el.type === "password") {
+      el.type = "text";
+      icon.classList.replace('fa-eye','fa-eye-slash');
+    } else {
+      el.type = "password";
+      icon.classList.replace('fa-eye-slash','fa-eye');
+    }
+  }
+</script>
+{% endblock %}

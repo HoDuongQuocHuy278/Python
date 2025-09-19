@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Hồ sơ{% endblock %}
+{% block content %}
+<div class="container">
+  <h1 class="h3">Xin chào, {{ current_user.fullname }}</h1>
+  <p>Email: {{ current_user.email }}</p>
+  <p>Quyền: {{ current_user.role }}</p>
+</div>
+{% endblock %}

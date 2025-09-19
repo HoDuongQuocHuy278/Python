@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Đăng ký tài khoản{% endblock %}
+
+{% block head %}
+<style>
+  :root{
+    --brand1:#6a8dff; --brand2:#34d399; --glass:rgba(255,255,255,.65); --shadow:0 20px 50px rgba(0,0,0,.12);
+  }
+  *{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans",sans-serif}
+  body{
+    min-height:100vh; overflow-x:hidden; background:#f7f9ff;
+    background-image:
+      radial-gradient(40rem 40rem at 80% -10%, rgba(106,141,255,.25), transparent 60%),
+      radial-gradient(40rem 40rem at -10% 90%, rgba(52,211,153,.22), transparent 60%);
+  }
+  .glassy-card{
+    background:var(--glass); backdrop-filter: blur(12px);
+    border:1px solid rgba(255,255,255,.5); border-radius:24px; box-shadow:var(--shadow);
+  }
+  .hero{ position:relative; padding-block: clamp(40px, 6vw, 80px); }
+  .brand-badge{
+    width:64px;height:64px; border-radius:20px; display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--brand1),var(--brand2)); color:#fff; box-shadow:var(--shadow);
+  }
+  .gradient-btn{ background:linear-gradient(135deg,var(--brand1),var(--brand2)); border:none; box-shadow:0 10px 24px rgba(106,141,255,.25); }
+  .form-floating>.form-control{ padding-left:3rem; }
+  .input-icon{ position:absolute; left:.9rem; top:50%; translate:0 -50%; color:#94a3b8; }
+  .pw-toggle{ position:absolute; right:.6rem; top:50%; translate:0 -50%; border:0;background:transparent; color:#64748b; }
+  .pw-meter{ height:8px; border-radius:999px; background:#e9ecef; overflow:hidden; }
+  .pw-meter>span{ display:block; height:100%; width:0%; transition:width .35s ease; background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981); }
+  .fine-print{ font-size:.9rem }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container hero">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
+      <div class="glassy-card p-4 p-md-5">
+        <div class="text-center mb-4">
+          <div class="brand-badge mx-auto mb-3"><i class="fa-solid fa-user-plus fa-lg"></i></div>
+          <h1 class="h3 fw-bold mb-1">Tạo tài khoản</h1>
+          <p class="text-muted mb-0">Nhanh chóng · An toàn · Miễn phí</p>
+        </div>
+
+        <!-- Flash từ server (đã có ở base.html, nhưng để chắc chắn có thể xuất hiện gần form) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <!-- Form: dùng WTForms + CSRF -->
+        <form id="registerForm" method="POST" novalidate class="needs-validation" action="{{ url_for('register') }}">
+          {{ form.hidden_tag() }}
+
+          <!-- Fullname -->
+          <div class="position-relative mb-3">
+            <i class="fa-regular fa-id-card input-icon"></i>
+            <div class="form-floating">
+              {{ form.fullname(
+                  class_="form-control " + ("is-invalid" if form.fullname.errors else ""),
+                  id="fullname",
+                  placeholder="Họ và tên",
+                  minlength="2",
+                  maxlength="50",
+                  required=True
+              ) }}
+              <label for="fullname">Họ và tên</label>
+              {% if form.fullname.errors %}
+                <div class="invalid-feedback">{{ form.fullname.errors[0] }}</div>
+              {% else %}
+                <div class="invalid-feedback">Vui lòng nhập họ tên (ít nhất 2 ký tự).</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="position-relative mb-3">
+            <i class="fa-regular fa-envelope input-icon"></i>
+            <div class="form-floating">
+              {{ form.email(
+                  class_="form-control " + ("is-invalid" if form.email.errors else ""),
+                  id="email",
+                  placeholder="you@example.com",
+                  required=True
+              ) }}
+              <label for="email">Email</label>
+              {% if form.email.errors %}
+                <div class="invalid-feedback">{{ form.email.errors[0] }}</div>
+              {% else %}
+                <div class="invalid-feedback">Email không hợp lệ.</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="position-relative mb-2">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <button type="button" class="pw-toggle" aria-label="Hiện/ẩn mật khẩu" onclick="togglePw('password', this)">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+            <div class="form-floating">
+              {{ form.password(
+                  class_="form-control " + ("is-invalid" if form.password.errors else ""),
+                  id="password",
+                  placeholder="Mật khẩu",
+                  minlength="6",
+                  required=True
+              ) }}
+              <label for="password">Mật khẩu</label>
+            </div>
+            {% if form.password.errors %}
+              <div class="invalid-feedback d-block">{{ form.password.errors[0] }}</div>
+            {% else %}
+              <div class="invalid-feedback d-block">Mật khẩu tối thiểu 6 ký tự, nên có chữ hoa, số & ký tự đặc biệt.</div>
+            {% endif %}
+          </div>
+
+          <!-- Meter -->
+          <div class="pw-meter mb-3" aria-hidden="true"><span id="pwBar"></span></div>
+
+          <!-- Confirm -->
+          <div class="position-relative mb-4">
+            <i class="fa-solid fa-shield-halved input-icon"></i>
+            <button type="button" class="pw-toggle" aria-label="Hiện/ẩn mật khẩu" onclick="togglePw('confirm', this)">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+            <div class="form-floating">
+              {{ form.confirm(
+                  class_="form-control " + ("is-invalid" if form.confirm.errors else ""),
+                  id="confirm",
+                  placeholder="Nhập lại mật khẩu",
+                  required=True
+              ) }}
+              <label for="confirm">Nhập lại mật khẩu</label>
+            </div>
+            {% if form.confirm.errors %}
+              <div class="invalid-feedback d-block">{{ form.confirm.errors[0] }}</div>
+            {% else %}
+              <div class="invalid-feedback d-block">Mật khẩu nhập lại chưa khớp.</div>
+            {% endif %}
+          </div>
+
+          <!-- Terms (client-side) -->
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" value="" id="terms" required>
+            <label class="form-check-label fine-print" for="terms">
+              Tôi đồng ý với <a href="#" class="link-underline">Điều khoản</a> & <a href="#" class="link-underline">Chính sách</a>.
+            </label>
+            <div class="invalid-feedback">Bạn cần đồng ý điều khoản.</div>
+          </div>
+
+          <!-- Actions -->
+          <div class="d-grid gap-2">
+            <button class="btn btn-lg text-white gradient-btn" type="submit">
+              <i class="fa-solid fa-user-check me-2"></i>{{ form.submit.label.text }}
+            </button>
+            <button class="btn btn-outline-dark btn-lg" type="reset">
+              <i class="fa-solid fa-rotate-left me-2"></i>Nhập lại
+            </button>
+          </div>
+        </form>
+
+        <div class="text-center mt-4 text-muted fine-print">
+          Đã có tài khoản? <a href="{{ url_for('login') }}" class="link-underline">Đăng nhập</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast hiển thị khi server flash success (tuỳ chọn) -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+  <div id="regToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body"><i class="fa-regular fa-circle-check me-2"></i>Đăng ký thành công!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Toggle password visibility
+  function togglePw(id, btn){
+    const el = document.getElementById(id);
+    const icon = btn.querySelector('i');
+    if(el.type === 'password'){ el.type='text'; icon.classList.replace('fa-eye','fa-eye-slash'); }
+    else{ el.type='password'; icon.classList.replace('fa-eye-slash','fa-eye'); }
+  }
+
+  // Simple password strength meter
+  const pw = document.getElementById('password');
+  const bar = document.getElementById('pwBar');
+  if (pw && bar) {
+    pw.addEventListener('input', () => {
+      const v = pw.value; let s = 0;
+      if(v.length >= 6) s++;
+      if(/[A-Z]/.test(v)) s++;
+      if(/[0-9]/.test(v)) s++;
+      if(/[^A-Za-z0-9]/.test(v)) s++;
+      bar.style.width = (s*25) + '%';
+    });
+  }
+
+  // Bootstrap validation + confirm match (client-side hỗ trợ cho WTForms)
+  (function(){
+    const form = document.getElementById('registerForm');
+    const confirmEl = document.getElementById('confirm');
+    const passwordEl = document.getElementById('password');
+
+    if (!form) return;
+
+    form.addEventListener('submit', function(e){
+      // confirm matches
+      if (passwordEl.value !== confirmEl.value){
+        confirmEl.setCustomValidity('Mismatch');
+      } else {
+        confirmEl.setCustomValidity('');
+      }
+
+      if (!form.checkValidity()){
+        e.preventDefault(); e.stopPropagation();
+      }
+      form.classList.add('was-validated');
+    });
+
+    confirmEl.addEventListener('input', ()=>{
+      if (passwordEl.value === confirmEl.value) confirmEl.setCustomValidity('');
+    });
+
+    // Nếu có flash 'success' từ server, bật toast nhẹ nhàng
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          {% if category == 'success' %}
+            const t = new bootstrap.Toast(document.getElementById('regToast'));
+            t.show();
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Chi tiết người dùng{% endblock %}
+{% block content %}
+<h3 class="mb-3">Thông tin người dùng</h3>
+<div class="card">
+  <div class="card-body">
+    <dl class="row">
+      <dt class="col-sm-3">ID</dt><dd class="col-sm-9">{{ u.id }}</dd>
+      <dt class="col-sm-3">Họ tên</dt><dd class="col-sm-9">{{ u.fullname }}</dd>
+      <dt class="col-sm-3">Email</dt><dd class="col-sm-9">{{ u.email }}</dd>
+      <dt class="col-sm-3">Role</dt><dd class="col-sm-9"><span class="badge text-bg-secondary">{{ u.role }}</span></dd>
+      <dt class="col-sm-3">Ngày tạo</dt><dd class="col-sm-9">{{ u.created_at }}</dd>
+    </dl>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_user_edit', uid=u.id) }}" class="btn btn-primary"><i class="fa fa-pen me-1"></i>Sửa</a>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">Quay lại</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
