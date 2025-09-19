@@ -1,152 +1,63 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <title>Oreka Clone</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-    }
-    /* Thanh trên cùng */
-    .top-bar {
-      background: #2e7d32;
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 15px;
-      font-size: 14px;
-    }
-    /* Navbar */
-    .navbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 20px;
-      background: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .navbar .logo {
-      font-size: 28px;
-      font-weight: bold;
-      color: #2e7d32;
-    }
-    .navbar input {
-      width: 40%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 20px;
-    }
-    .nav-links {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-    .nav-links a {
-      text-decoration: none;
-      color: #333;
-      font-size: 15px;
-    }
-    .btn-sell {
-      background: #2e7d32;
-      color: white !important;
-      padding: 6px 14px;
-      border-radius: 18px;
-      font-weight: bold;
-    }
-    /* Banner */
-    .banner img {
-      width: 100%;
-      display: block;
-      border-radius: 8px;
-      margin: 15px 0;
-    }
-    /* Danh mục */
-    .categories {
-      padding: 20px;
-      background: white;
-      margin: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .categories h2 {
-      margin-bottom: 15px;
-      color: #2e7d32;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 20px;
-    }
-    .item {
-      text-align: center;
-      transition: transform 0.2s;
-      cursor: pointer;
-    }
-    .item img {
-      width: 100px;
-      height: 100px;
-      object-fit: cover;
-      border-radius: 10px;
-    }
-    .item:hover {
-      transform: scale(1.05);
-    }
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 15px;
-      background: #2e7d32;
-      color: white;
-      margin-top: 30px;
-    }
-  </style>
-</head>
-<body>
-  <!-- Thanh trên cùng -->
-  <header>
-    <div class="top-bar">
-      <span>🌍 Oreka - Nền tảng mua bán đồ cũ vì một trái đất xanh hơn!</span>
-      <span>✅ Hoàn tiền 100% nếu sản phẩm không đúng mô tả!</span>
-    </div>
-    <nav class="navbar">
-      <div class="logo">Oreka</div>
-      <input type="text" placeholder="🔍 Tìm trên Oreka...">
-      <div class="nav-links">
-        <a href="#">Đăng ký</a>
-        <a href="#">Đăng nhập</a>
-        <a href="#" class="btn-sell">+ Đăng bán</a>
-      </div>
-    </nav>
-  </header>
+{% extends "base.html" %}
+{% block title %}Trao đổi đồ cũ{% endblock %}
 
+{% block extra_head %}
+<style>
+  body { margin:0; background:#f9f9f9 }
+  /* Top bar */
+  .top-bar{background:#2e7d32;color:#fff;display:flex;justify-content:space-between;padding:6px 15px;font-size:14px}
+  /* Nav */
+  .navbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.08)}
+  .navbar .logo{font-size:26px;font-weight:800;color:#2e7d32;text-decoration:none;white-space:nowrap}
+  .navbar .search{width:40%;display:flex;gap:8px;align-items:center}
+  .navbar .search input{flex:1;padding:10px 14px;border:1px solid #dcdcdc;border-radius:20px;outline:none}
+  .nav-links{display:flex;gap:16px;align-items:center}
+  .nav-links a{color:#333;text-decoration:none;font-size:15px}
+  .btn-sell{background:#2e7d32;color:#fff !important;padding:8px 16px;border-radius:18px;font-weight:600;text-decoration:none}
+
+  /* Banner */
+  .container{max-width:1200px;margin:0 auto;padding:0 16px}
+  .banner img{width:100%;display:block;border-radius:10px;margin:16px 0}
+
+  /* Categories */
+  .categories{padding:20px;background:#fff;margin:16px;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,.06)}
+  .categories h2{margin:0 0 12px;color:#2e7d32}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:18px}
+  .item{text-align:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px}
+  .item:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.06)}
+  .item img{width:90px;height:90px;object-fit:cover;border-radius:10px;display:block;margin:0 auto 8px}
+
+  /* Footer */
+  footer{text-align:center;padding:16px;background:#2e7d32;color:#fff;margin-top:30px}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<main class="container">
   <!-- Banner -->
   <section class="banner">
-    <img src="https://via.placeholder.com/1200x300?text=Siêu+Sale+Oreka" alt="Banner">
+    <img src="https://via.placeholder.com/1200x300?text=Khuyen+Mai+-+Trao+doi+do+cu" alt="Banner">
   </section>
 
   <!-- Danh mục -->
   <section class="categories">
     <h2>Danh mục nổi bật</h2>
     <div class="grid">
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Sách</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Thời trang nữ</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Thời trang nam</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Mẹ & bé</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Đồ chơi</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Xe cộ</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Đồ gia dụng</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Giày dép</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Đồ điện tử</p></div>
-      <div class="item"><img src="https://via.placeholder.com/100"><p>Thú cưng</p></div>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Sách</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thời trang nữ</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thời trang nam</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Mẹ &amp; bé</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ chơi</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Xe cộ</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ gia dụng</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Giày dép</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Đồ điện tử</p></a>
+      <a class="item" href="#"><img src="https://via.placeholder.com/100" alt=""><p>Thú cưng</p></a>
     </div>
   </section>
+</main>
 
-  <!-- Footer -->
-  <footer>
-    <p>© 2025 Oreka Clone - Xây dựng bằng Flask & HTML</p>
-  </footer>
-</body>
-</html>
+
+
+{% endblock %}
