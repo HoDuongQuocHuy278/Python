@@ -95,8 +95,10 @@ def inject_user():
 def home():
     u = session.get("user")
     if not u:
-        return redirect(url_for("login"))
-    return render_template("home.html")
+        # khách chưa đăng nhập vẫn xem marketplace
+        return render_template("home.html", title="Trao đổi đồ cũ")
+    return render_template("home.html", title="Trao đổi đồ cũ")
+
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
