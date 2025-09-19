@@ -1,17 +1,14 @@
 from flask import (
     Flask, render_template, redirect, url_for, flash,
-    request, session, abort,send_from_directory 
-
+    request, session, abort, send_from_directory, jsonify
 )
 from wtforms import (
     StringField, PasswordField, SubmitField, SelectField, HiddenField,
     DecimalField, TextAreaField
 )
-from pathlib import Path                     
-import os  
+from pathlib import Path
+import os
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField, HiddenField
-from wtforms.validators import DataRequired, Email, Length, EqualTo
 from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
 from flask_wtf.file import FileField, FileAllowed
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -19,24 +16,53 @@ import mysql.connector
 from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
-
-
-from flask import Flask, render_template, request, jsonify
 from openai import OpenAI
+from decimal import Decimal
+from dotenv import load_dotenv
 
+load_dotenv()  # đọc file .env
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
+# =========================================================
+# Flask app & OpenAI
+# =========================================================
 app = Flask(__name__)
+# Secret key + session config
+app.config["SECRET_KEY"] = "dev-secret-key-change-me"
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
-# Dán API key của bạn vào đây
-client = OpenAI(api_key="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")
+# Upload
+BASE_DIR = Path(app.root_path)
+INSTANCE_DIR = Path(app.instance_path)
+MEDIA_DIR = INSTANCE_DIR / "uploads"
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+app.config["MEDIA_ROOT"] = str(MEDIA_DIR)
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"]
 
+# DB config
+DB_CONFIG = dict(
+    host="localhost",
+    user="root",
+    password="",
+    database="user_manager",
+    auth_plugin="mysql_native_password",
+)
+
+def get_conn():
+    return mysql.connector.connect(**DB_CONFIG)
+
+# =========================================================
+# Chatbot API
+# =========================================================
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
     try:
         data = request.get_json(force=True)
         user_message = data.get("message", "")
-
         if not user_message:
             return jsonify({"reply": "⚠️ Bạn chưa nhập tin nhắn."})
 
@@ -47,10 +73,8 @@ def chatbot():
                 {"role": "user", "content": user_message}
             ]
         )
-
         reply = response.choices[0].message.content
         return jsonify({"reply": reply})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
