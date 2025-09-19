@@ -28,7 +28,6 @@ from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange
 
 
 import os, time
-from decimal import Decimal
 from pathlib import Path
 
 import mysql.connector
@@ -37,11 +36,14 @@ from contextlib import closing
 from functools import wraps
 
 from openai import OpenAI
-from decimal import Decimal
 from dotenv import load_dotenv
+import os
 
 load_dotenv()  # đọc file .env
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+
 
 # =========================================================
 # Flask app & OpenAI
