@@ -1,9 +1,8 @@
 from flask import (
     Flask, render_template, redirect, url_for, flash,
-
     request, session, abort, send_from_directory, jsonify
-
 )
+
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
 
@@ -11,23 +10,15 @@ from wtforms import (
     StringField, PasswordField, SubmitField, SelectField, HiddenField,
     DecimalField, TextAreaField
 )
-
-from pathlib import Path
-import os
-from flask_wtf import FlaskForm
-from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
-from flask_wtf.file import FileField, FileAllowed
-
 from wtforms.validators import (
     DataRequired, Email, Length, EqualTo, NumberRange, Optional
 )
 
-
-from flask_wtf.file import FileField, FileAllowed
-from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
-
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 import os, time
+from decimal import Decimal
 from pathlib import Path
 
 import mysql.connector
@@ -35,15 +26,13 @@ from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
 
+
 from openai import OpenAI
+from decimal import Decimal
 from dotenv import load_dotenv
-import os
 
 load_dotenv()  # đọc file .env
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-
 
 # =========================================================
 # Flask app & OpenAI
@@ -80,7 +69,6 @@ def get_conn():
 # =========================================================
 # Chatbot API
 # =========================================================
-app = Flask(__name__)
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
     try:
@@ -96,14 +84,10 @@ def chatbot():
                 {"role": "user", "content": user_message}
             ]
         )
-        reply = response.choices[0].message.content
-        return jsonify({"reply": reply})
+        reply = response.choices[0].message.content if response.choices else "⚠️ Không có phản hồi."
+        return jsonify({"reply": str(reply)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-
-
 
 
 # ===================== App & Config =====================
@@ -179,7 +163,6 @@ def _save_image(file_storage):
         return None
 
     return new_name
-
 
 app.config["SECRET_KEY"] = "dev-secret-key-change-me"  # Đổi khi deploy
 # Một số bảo vệ session cơ bản
@@ -608,6 +591,26 @@ def listing_detail(lid):
         flash("Tin đăng không tồn tại hoặc đã ẩn.", "warning")
         return redirect(url_for("home"))
     return render_template("listing_detail.html", item=item)
+
+
+@app.route("/search")
+def search():
+    q = (request.args.get("q") or "").strip()
+    sql = """
+      SELECT id, title, price, status, created_at, cover_image, category, condition_level, location
+      FROM listings
+      WHERE status='active'
+    """
+    params = []
+    if q:
+        sql += " AND (title LIKE %s OR description LIKE %s OR location LIKE %s)"
+        like = f"%{q}%"; params += [like, like, like]
+    sql += " ORDER BY id DESC LIMIT 500"
+
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute(sql, params); rows = cur.fetchall()
+    return render_template("search.html", rows=rows, q=q, CATEGORIES=CATEGORIES, CONDITIONS=CONDITIONS)
+
 # ===================== Main =====================
 if __name__ == "__main__":
     # Nhớ Start Apache + MySQL trong XAMPP trước khi chạy
