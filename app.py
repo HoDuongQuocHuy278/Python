@@ -1,6 +1,6 @@
 from flask import (
     Flask, render_template, redirect, url_for, flash,
-    request, session, abort, send_from_directory
+    request, session, abort, send_from_directory, jsonify, current_app as app
 )
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
@@ -508,8 +508,8 @@ def my_listings():
     return render_template("my_listings.html", rows=rows)
 
 
-@app.route("/listing/<int:lid>")
-def listing_detail(lid):
+@app.route("/listing/<int:id>")
+def listing_detail(ld):
     """Trang chi tiết 1 tin đăng (ai cũng xem được trừ khi tin bị ẩn)."""
     with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
         cur.execute("""
@@ -519,12 +519,220 @@ def listing_detail(lid):
             FROM listings l
             JOIN users u ON u.id = l.user_id
             WHERE l.id = %s AND l.status <> 'hidden'
-        """, (lid,))
+        """, (id,))
         item = cur.fetchone()
     if not item:
         flash("Tin đăng không tồn tại hoặc đã ẩn.", "warning")
         return redirect(url_for("home"))
     return render_template("listing_detail.html", item=item)
+
+# tìm kiếm 
+
+@app.route("/api/suggest")
+def api_suggest():
+    term = (request.args.get("q") or request.args.get("term") or "").strip()
+    items = []
+
+    if term:
+        t = term.lower()
+        # Ưu tiên gợi ý danh mục khớp
+        for val, label in CATEGORIES:
+            if t in val.lower() or t in label.lower():
+                items.append({
+                    "type": "category",
+                    "label": label,
+                    "url": url_for("search", category=val, q=term)
+                })
+                if len(items) >= 4:
+                    break
+
+    # Gợi ý tiêu đề tin
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        like = f"%{term}%"
+        cur.execute("""
+            SELECT id, title
+            FROM listings
+            WHERE status='active' AND title LIKE %s
+            ORDER BY id DESC
+            LIMIT 8
+        """, (like,))
+        rows = cur.fetchall()
+    for r in rows:
+        items.append({
+            "type": "listing",
+            "id": r["id"],
+            "label": r["title"],
+            "url": url_for("listing_detail", lid=r["id"])
+        })
+
+    return jsonify({"query": term, "items": items[:10]})
+
+@app.get("/search")
+def search():
+    # ---- 1) Lấy params & chuẩn hóa ----
+    q            = (request.args.get("q") or "").strip()
+    category     = (request.args.get("category") or "").strip() or None
+    cond         = (request.args.get("condition") or "").strip() or None
+    min_price_s  = (request.args.get("min_price") or "").replace(",", "").strip()
+    max_price_s  = (request.args.get("max_price") or "").replace(",", "").strip()
+    sort         = (request.args.get("sort") or "newest").strip()
+    page         = request.args.get("page", 1, type=int)
+    per_page     = request.args.get("per_page", 24, type=int)
+    page         = max(page, 1)
+    per_page     = max(min(per_page, 60), 1)  # giới hạn 1..60/ trang
+
+    def parse_decimal(s):
+        try:
+            return Decimal(s) if s else None
+        except Exception:
+            return None
+
+    min_price = parse_decimal(min_price_s)
+    max_price = parse_decimal(max_price_s)
+
+    # ---- 2) WHERE & PARAMS ----
+    base_from = """
+      FROM listings l
+      LEFT JOIN users u ON u.id = l.user_id
+      WHERE l.status = 'active'
+    """
+    where = []
+    params = []
+
+    if q:
+        where.append("(l.title LIKE %s OR l.description LIKE %s OR l.location LIKE %s)")
+        like = f"%{q}%"
+        params += [like, like, like]
+    if category:
+        where.append("l.category = %s")
+        params.append(category)
+    if cond:
+        where.append("l.condition_level = %s")
+        params.append(cond)
+    if min_price is not None:
+        where.append("l.price >= %s")
+        params.append(min_price)
+    if max_price is not None:
+        where.append("l.price <= %s")
+        params.append(max_price)
+
+    where_sql = (" AND ".join(where)) if where else "1=1"
+
+    # ---- 3) ORDER BY ----
+    ORDER_BY = {
+        "newest":     "l.created_at DESC",
+        "oldest":     "l.created_at ASC",
+        "price_asc":  "l.price ASC",
+        "price_desc": "l.price DESC",
+    }
+    order_by = ORDER_BY.get(sort, ORDER_BY["newest"])
+
+    # ---- 4) Đếm tổng bản ghi cho phân trang ----
+    count_sql = f"""
+      SELECT COUNT(*) AS total
+      {base_from} AND {where_sql}
+    """
+
+    # ---- 5) Trang hiện tại + OFFSET/LIMIT ----
+    offset = (page - 1) * per_page
+
+    # ---- 6) Câu lệnh chính lấy dữ liệu ----
+    data_sql = f"""
+      SELECT
+        l.id, l.title, l.price, l.status, l.created_at,
+        l.cover_image, l.category, l.condition_level, l.location,
+        u.fullname AS uploader_name  
+      {base_from} AND {where_sql}
+      ORDER BY {order_by}
+      LIMIT %s OFFSET %s
+    """
+
+    # ---- 7) Lấy gợi ý nhanh (lên đầu trang) ----
+    suggest_sql = f"""
+      SELECT l.id, l.title
+      {base_from} AND {where_sql}
+      ORDER BY l.created_at DESC
+      LIMIT 8
+    """
+
+    # ---- 8) Thực thi ----
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        # count
+        cur.execute(count_sql, params)
+        total = cur.fetchone()["total"] if cur.rowcount is not None else 0
+
+        # data
+        cur.execute(data_sql, params + [per_page, offset])
+        rows = cur.fetchall()
+
+        # suggestions
+        cur.execute(suggest_sql, params)
+        quick_suggestions = cur.fetchall()
+
+    # ---- 9) Map rows -> results theo định dạng search.html ----
+    def fmt_price(v):
+        try:
+            return f"{Decimal(v):,.0f}₫"
+        except Exception:
+            return str(v) if v is not None else ""
+
+    results = []
+    for r in rows:
+        # caption ghép từ category + condition (nếu có dict map)
+        cat_label = (CATEGORIES.get(r["category"]) if hasattr(CATEGORIES, "get") else r["category"]) or "Khác"
+        cond_label = (CONDITIONS.get(r["condition_level"]) if hasattr(CONDITIONS, "get") else r["condition_level"]) or ""
+        caption = f"{cat_label}" + (f" · {cond_label}" if cond_label else "")
+
+        results.append({
+            "url": url_for("listing_detail", id=r["id"]) if "listing_detail" in app.view_functions else f"/listing/{r['id']}",
+            "image_url": r["cover_image"] or url_for("static", filename="img/placeholder.png"),
+            "name": r["title"] or f"Mục #{r['id']}",
+            "intro": " · ".join([s for s in [(r.get("location") or "").strip(), fmt_price(r.get("price"))] if s]),
+            "caption": caption,
+            "uploader_name": r.get("uploader_name") or "Ẩn danh",
+        })
+
+    # ---- 10) Xây pagination object cho template ----
+    total_pages = (total + per_page - 1) // per_page if per_page else 1
+    total_pages = max(total_pages, 1)
+    page = min(page, total_pages)
+
+    def build_url(page_number: int):
+        args = request.args.to_dict(flat=True)
+        args["page"] = page_number
+        args["per_page"] = per_page
+        return url_for("search", **args)
+
+    # tạo dải trang (ví dụ hiển thị tối đa 7 nút)
+    window = 7
+    half = window // 2
+    start = max(page - half, 1)
+    end = min(start + window - 1, total_pages)
+    start = max(min(start, max(1, end - window + 1)), 1)
+
+    pages = [{"number": i, "url": build_url(i), "active": (i == page)} for i in range(start, end + 1)]
+
+    pagination = {
+        "prev_url": build_url(page - 1) if page > 1 else None,
+        "next_url": build_url(page + 1) if page < total_pages else None,
+        "pages": pages,
+    }
+
+    # ---- 11) Render ----
+    return render_template(
+        "search.html",
+        q=q,
+        results=results,
+        pagination=pagination,
+        quick_suggestions=quick_suggestions,  # nếu muốn hiển thị, thêm block Jinja trong template
+        CATEGORIES=CATEGORIES,
+        CONDITIONS=CONDITIONS,
+        category=category,
+        condition=cond,
+        min_price=min_price_s,
+        max_price=max_price_s,
+        sort=sort,
+    )
 # ===================== Main =====================
 if __name__ == "__main__":
     # Nhớ Start Apache + MySQL trong XAMPP trước khi chạy
