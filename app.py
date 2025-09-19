@@ -20,8 +20,45 @@ from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
 
-# ===================== App & Config =====================
+
+from flask import Flask, render_template, request, jsonify
+from openai import OpenAI
+
+
+
 app = Flask(__name__)
+
+# Dán API key của bạn vào đây
+client = OpenAI(api_key="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")
+
+@app.route("/chatbot", methods=["POST"])
+def chatbot():
+    try:
+        data = request.get_json(force=True)
+        user_message = data.get("message", "")
+
+        if not user_message:
+            return jsonify({"reply": "⚠️ Bạn chưa nhập tin nhắn."})
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Bạn là chatbot hỗ trợ người dùng."},
+                {"role": "user", "content": user_message}
+            ]
+        )
+
+        reply = response.choices[0].message.content
+        return jsonify({"reply": reply})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+# ===================== App & Config =====================
+
 app.config["SECRET_KEY"] = "dev-secret-key-change-me"  # Đổi khi deploy
 # Một số bảo vệ session cơ bản
 app.config.update(
