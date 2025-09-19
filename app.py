@@ -1,10 +1,19 @@
 from flask import (
     Flask, render_template, redirect, url_for, flash,
-    request, session, abort
+    request, session, abort,send_from_directory 
+
 )
+from wtforms import (
+    StringField, PasswordField, SubmitField, SelectField, HiddenField,
+    DecimalField, TextAreaField
+)
+from pathlib import Path                     
+import os  
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, SelectField, HiddenField
 from wtforms.validators import DataRequired, Email, Length, EqualTo
+from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional
+from flask_wtf.file import FileField, FileAllowed
 from werkzeug.security import generate_password_hash, check_password_hash
 import mysql.connector
 from mysql.connector import Error
@@ -20,6 +29,17 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
+from pathlib import Path
+BASE_DIR = Path(app.root_path)
+INSTANCE_DIR = Path(app.instance_path)
+MEDIA_DIR = INSTANCE_DIR / "uploads"
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+
+app.config["MEDIA_ROOT"] = str(MEDIA_DIR)
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+ALLOWED_EXTS = ["jpg","jpeg","png","webp"]
+
+
 # ===================== MySQL (XAMPP) =====================
 DB_CONFIG = dict(
     host="localhost",
@@ -34,6 +54,21 @@ def get_conn():
     return mysql.connector.connect(**DB_CONFIG)
 
 # ===================== WTForms =====================
+
+CATEGORIES = [
+    ("Sách","Sách"), ("Thời trang nữ","Thời trang nữ"), ("Thời trang nam","Thời trang nam"),
+    ("Mẹ & bé","Mẹ & bé"), ("Đồ chơi","Đồ chơi"), ("Xe cộ","Xe cộ"),
+    ("Đồ gia dụng","Đồ gia dụng"), ("Giày dép","Giày dép"),
+    ("Đồ điện tử","Đồ điện tử"), ("Thú cưng","Thú cưng"),
+]
+CONDITIONS = [
+    ("new","Mới 100%"),
+    ("like_new","Như mới"),
+    ("used","Đã qua sử dụng"),
+    ("for_parts","Hỏng/để lấy linh kiện"),
+]
+# Nếu chưa có biến ALLOWED_EXTS ở phần cấu hình upload, thêm:
+ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"]
 class RegisterForm(FlaskForm):
     fullname = StringField("Họ và tên", validators=[DataRequired(), Length(min=2, max=50)])
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=100)])
@@ -43,6 +78,18 @@ class RegisterForm(FlaskForm):
         validators=[DataRequired(), EqualTo("password", "Mật khẩu không khớp")]
     )
     submit = SubmitField("Tạo tài khoản")
+
+class SellForm(FlaskForm):
+    title = StringField("Tiêu đề", validators=[DataRequired(), Length(min=5, max=120)])
+    description = TextAreaField("Mô tả chi tiết", validators=[DataRequired(), Length(min=10, max=5000)])
+    price = DecimalField("Giá (VND)", places=0, rounding=None,
+                         validators=[DataRequired(), NumberRange(min=0)])
+    category = SelectField("Danh mục", choices=CATEGORIES, validators=[DataRequired()])
+    condition_level = SelectField("Tình trạng", choices=CONDITIONS, validators=[DataRequired()])
+    location = StringField("Khu vực", validators=[Optional(), Length(max=100)])
+    image = FileField("Ảnh bìa (jpg/png/webp)",
+                      validators=[Optional(), FileAllowed(ALLOWED_EXTS, "Định dạng ảnh không hợp lệ")])
+    submit = SubmitField("Đăng bán")
 
 class LoginForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=100)])
@@ -86,9 +133,12 @@ def roles_required(*allowed_roles):
 
 @app.context_processor
 def inject_user():
-    """Đưa current_user & helper vào template."""
     u = session.get("user")
-    return dict(current_user=u, is_logged_in=bool(u))
+    def media_url(name):
+        import os
+        if not name: return None
+        return url_for("uploaded_file", filename=os.path.basename(name))
+    return dict(current_user=u, is_logged_in=bool(u), media_url=media_url)
 
 # ===================== Routes cơ bản =====================
 @app.route("/")
@@ -277,6 +327,10 @@ def admin_user_delete(uid):
     flash("Đã xoá người dùng.", "success")
     return redirect(url_for("admin_users"))
 
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    from flask import send_from_directory
+    return send_from_directory(app.config["MEDIA_ROOT"], filename)
 # ===================== Error handlers =====================
 @app.errorhandler(403)
 def forbidden(_):
@@ -287,7 +341,117 @@ def forbidden(_):
 def not_found(_):
     flash("Không tìm thấy trang bạn yêu cầu.", "warning")
     return redirect(url_for("home"))
+@app.route("/sell", methods=["GET", "POST"])
+@login_required
+def sell():
+    """
+    Trang đăng bán sản phẩm.
+    - Yêu cầu đăng nhập (login_required)
+    - Xử lý form: lưu ảnh bìa (nếu có), insert DB, rồi chuyển về /my/listings
+    """
+    form = SellForm()
 
+    if form.validate_on_submit():
+        # Lấy dữ liệu form
+        title = form.title.data.strip()
+        description = form.description.data.strip()
+        # Ép giá về Decimal, chấp nhận người dùng nhập có dấu phẩy
+        try:
+            from decimal import Decimal
+            price = (
+                Decimal(form.price.data)
+                if isinstance(form.price.data, (int, float, Decimal))
+                else Decimal(str(form.price.data).replace(",", "").strip())
+            )
+        except Exception:
+            flash("Giá không hợp lệ.", "warning")
+            return render_template("sell.html", form=form)
+
+        category = form.category.data
+        condition_level = form.condition_level.data
+        location = (form.location.data or "").strip() or None
+
+        # Lưu ảnh bìa (trả về tên file hoặc None)
+        try:
+            cover_path = _save_image(form.image.data)
+        except Exception:
+            cover_path = None
+
+        # Ghi DB
+        try:
+            with closing(get_conn()) as conn:
+                # đảm bảo charset cho MySQL
+                try:
+                    conn.set_charset_collation('utf8mb4', 'utf8mb4_unicode_ci')
+                except Exception:
+                    pass
+                with closing(conn.cursor()) as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO listings
+                          (user_id, title, description, price, category, condition_level, location, cover_image, status)
+                        VALUES
+                          (%s, %s, %s, %s, %s, %s, %s, %s, 'active')
+                        """,
+                        (
+                            session["user"]["id"],
+                            title,
+                            description,
+                            str(price),            # lưu Decimal dưới dạng chuỗi số
+                            category,
+                            condition_level,
+                            location,
+                            cover_path,            # chỉ tên file nếu dùng instance/uploads
+                        ),
+                    )
+                    conn.commit()
+            flash("Đăng bán thành công!", "success")
+            return redirect(url_for("my_listings"))
+
+        except Error as e:
+            print("MySQL error at /sell:", e)
+            flash("Không thể lưu tin đăng. Vui lòng kiểm tra kết nối MySQL.", "danger")
+
+    elif request.method == "POST":
+        # POST nhưng form không hợp lệ
+        flash("Vui lòng kiểm tra lại các trường còn thiếu/không hợp lệ.", "warning")
+
+    # GET hoặc lỗi -> render lại form
+    return render_template("sell.html", form=form)
+
+
+@app.route("/my/listings")
+@login_required
+def my_listings():
+    """Danh sách tin đăng của chính người dùng hiện tại."""
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute("""
+            SELECT id, title, price, status, created_at, cover_image
+            FROM listings
+            WHERE user_id = %s
+            ORDER BY id DESC
+        """, (session["user"]["id"],))
+        rows = cur.fetchall()
+    return render_template("my_listings.html", rows=rows)
+
+
+@app.route("/listing/<int:lid>")
+def listing_detail(lid):
+    """Trang chi tiết 1 tin đăng (ai cũng xem được trừ khi tin bị ẩn)."""
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute("""
+            SELECT l.id, l.title, l.description, l.price, l.category, l.condition_level, l.location,
+                   l.cover_image, l.status, l.created_at,
+                   u.fullname AS seller_name, u.email AS seller_email
+            FROM listings l
+            JOIN users u ON u.id = l.user_id
+            WHERE l.id = %s AND l.status <> 'hidden'
+        """, (lid,))
+        item = cur.fetchone()
+    if not item:
+        flash("Tin đăng không tồn tại hoặc đã ẩn.", "warning")
+        return redirect(url_for("home"))
+    return render_template("listing_detail.html", item=item)
 # ===================== Main =====================
 if __name__ == "__main__":
     # Nhớ Start Apache + MySQL trong XAMPP trước khi chạy

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Tin đăng của tôi | Trao đổi đồ cũ{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="m-0">Tin đăng của tôi</h3>
+    <a class="btn btn-success" href="{{ url_for('sell') }}">+ Đăng bán</a>
+  </div>
+
+  {% if rows %}
+  <div class="row g-3">
+    {% for r in rows %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm">
+        {% if r.cover_image %}
+          <img class="card-img-top" src="{{ media_url(r.cover_image) }}" alt="Ảnh">
+        {% else %}
+          <div class="bg-light d-flex align-items-center justify-content-center" style="height:180px;">
+            <span class="text-muted">Chưa có ảnh</span>
+          </div>
+        {% endif %}
+        <div class="card-body">
+          <h6 class="card-title text-truncate mb-1">{{ r.title }}</h6>
+          <div class="text-danger fw-semibold mb-1">
+            {{ "{:,.0f}đ".format((r.price|float)) }}
+          </div>
+          <div class="small text-muted">Trạng thái: {{ r.status }} · {{ r.created_at }}</div>
+          <a class="stretched-link" href="{{ url_for('listing_detail', lid=r.id) }}"></a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="alert alert-info">Bạn chưa có tin đăng nào. Bấm “Đăng bán” để tạo tin đầu tiên.</div>
+  {% endif %}
+</div>
+{% endblock %}

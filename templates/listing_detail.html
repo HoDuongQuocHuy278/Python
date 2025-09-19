@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} | Trao đổi đồ cũ{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+  <div class="row g-4">
+    <div class="col-lg-6">
+      {% if item.cover_image %}
+        <img class="img-fluid rounded border" src="{{ media_url(item.cover_image) }}" alt="{{ item.title }}">
+      {% else %}
+        <div class="border rounded p-5 text-center text-muted">Chưa có ảnh</div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+      <h3 class="fw-bold">{{ item.title }}</h3>
+      <div class="text-danger fs-4 fw-semibold mb-2">
+        {{ "{:,.0f}đ".format((item.price|float)) }}
+      </div>
+
+      <div class="mb-2"><span class="text-muted">Danh mục:</span> {{ item.category }}</div>
+      <div class="mb-2"><span class="text-muted">Tình trạng:</span>
+        {% if item.condition_level == 'new' %}Mới 100%
+        {% elif item.condition_level == 'like_new' %}Như mới
+        {% elif item.condition_level == 'used' %}Đã qua sử dụng
+        {% else %}Hỏng/để lấy linh kiện{% endif %}
+      </div>
+      <div class="mb-2"><span class="text-muted">Khu vực:</span> {{ item.location or '—' }}</div>
+      <div class="mb-3"><span class="text-muted">Ngày đăng:</span> {{ item.created_at }}</div>
+
+      <div class="border rounded p-3 bg-white">
+        <div class="small text-muted mb-1">Người bán</div>
+        <div class="fw-semibold">{{ item.seller_name }}</div>
+        <div class="text-muted">{{ item.seller_email }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <h5>Mô tả chi tiết</h5>
+    <div class="bg-white border rounded p-3">
+      <pre class="mb-0" style="white-space:pre-wrap">{{ item.description }}</pre>
+    </div>
+  </div>
+</div>
+{% endblock %}

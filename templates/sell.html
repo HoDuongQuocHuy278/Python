@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Đăng bán | Trao đổi đồ cũ{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-hint{color:#6b7280}
+  .img-preview{display:none;max-height:220px;border:1px solid #eee;border-radius:10px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+  <h3 class="mb-3">Đăng bán sản phẩm</h3>
+
+  <form method="post" enctype="multipart/form-data" class="row g-3">
+    {{ form.csrf_token }}
+
+    <div class="col-12">
+      <label class="form-label">{{ form.title.label }}</label>
+      {{ form.title(class="form-control", placeholder="Ví dụ: iPhone 12 128GB quốc tế") }}
+      {% for e in form.title.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">{{ form.price.label }}</label>
+      {{ form.price(class="form-control", placeholder="VD: 3500000") }}
+      <div class="form-text form-hint">Nhập số, không cần dấu chấm phẩy.</div>
+      {% for e in form.price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">{{ form.category.label }}</label>
+      {{ form.category(class="form-select") }}
+      {% for e in form.category.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">{{ form.condition_level.label }}</label>
+      {{ form.condition_level(class="form-select") }}
+      {% for e in form.condition_level.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">{{ form.location.label }}</label>
+      {{ form.location(class="form-control", placeholder="VD: Hà Nội, Cầu Giấy") }}
+      {% for e in form.location.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">{{ form.image.label }}</label>
+      {{ form.image(class="form-control", accept=".jpg,.jpeg,.png,.webp", onchange="previewFile(this)") }}
+      <div class="form-text form-hint">Tối đa 5MB. Hỗ trợ: jpg, jpeg, png, webp</div>
+      {% for e in form.image.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-12">
+      <img id="preview" class="img-preview mb-2" alt="Xem trước ảnh">
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">{{ form.description.label }}</label>
+      {{ form.description(class="form-control", rows="6", placeholder="Mô tả chi tiết: tình trạng, phụ kiện kèm, lý do bán...") }}
+      {% for e in form.description.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="col-12">
+      {{ form.submit(class="btn btn-success") }}
+      <a class="btn btn-outline-secondary ms-2" href="{{ url_for('my_listings') }}">Tin đăng của tôi</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewFile(input){
+  const file = input.files && input.files[0];
+  const img = document.getElementById('preview');
+  if(!file){ img.style.display='none'; img.src=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => { img.src = e.target.result; img.style.display = 'block'; };
+  reader.readAsDataURL(file);
+}
+</script>
+{% endblock %}
