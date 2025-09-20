@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Tìm kiếm{% endblock %}
+
+{#
+  EXPECTED CONTEXT from Flask:
+  - q:        current search query (string)
+  - results:  list of items; each item has
+              { url, image_url, name, intro, caption, uploader_name }
+  - quick_suggestions: optional list[{id,title}] (link tới chi tiết)
+  - CATEGORIES, CONDITIONS: optional dict cho bộ lọc
+  - category, condition, min_price, max_price, sort: giá trị đang chọn (string)
+  - pagination: optional {
+        prev_url, next_url,
+        pages: [{number, url, active: bool}]
+    }
+  Route example được cập nhật trong code backend của bạn.
+#}
+
+{% block content %}
+{# --- Macros: hỗ trợ cả dict hoặc list[(key,label)] --- #}
+{% macro options_for(data, selected) -%}
+  <option value="">Tất cả</option>
+  {% if data is mapping %}
+    {% for key, label in data.items() %}
+      <option value="{{ key }}" {{ 'selected' if selected==key else '' }}>{{ label }}</option>
+    {% endfor %}
+  {% elif data is sequence %}
+    {% for opt in data %}
+      {% if opt is sequence and (opt|length)>0 %}
+        {% set key = opt[0] %}
+        {% set label = opt[1] if (opt|length)>1 else opt[0] %}
+      {% else %}
+        {% set key = opt %}{% set label = opt %}
+      {% endif %}
+      <option value="{{ key }}" {{ 'selected' if selected==key else '' }}>{{ label }}</option>
+    {% endfor %}
+  {% endif %}
+{%- endmacro %}
+
+{% macro label_from(data, key) -%}
+  {% if data is mapping %}
+    {{ data.get(key, key) }}
+  {% elif data is sequence %}
+    {%- set found = none -%}
+    {% for opt in data %}
+      {% if opt is sequence and (opt|length)>0 and opt[0]==key %}
+        {% set found = opt[1] if (opt|length)>1 else opt[0] %}
+      {% endif %}
+    {% endfor %}
+    {{ found if found is not none else key }}
+  {% else %}
+    {{ key }}
+  {% endif %}
+{%- endmacro %}
+
+<style>
+  :root{ --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.10); --shadow-sm:0 6px 18px rgba(0,0,0,.08);} 
+  .search-page{ background:#fff; color:#111; }
+  .object-cover{ width:100%; height:100%; object-fit:cover; }
+  .ratio-16x9{ position:relative; width:100%; padding-top:56.25%; background:#f6f6f7; border-top-left-radius:var(--radius); border-top-right-radius:var(--radius); overflow:hidden; }
+  .ratio-16x9>img,.ratio-16x9>div{ position:absolute; inset:0; }
+  .line-clamp-1{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-3{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .card-hover{ transition:.18s ease; border-radius:var(--radius); }
+  .card-hover:hover{ transform:translateY(-3px); box-shadow:var(--shadow) !important; }
+  .result-card .uploader{ font-size:.9rem; color:#6c757d; }
+  .filters-card{ position:sticky; top:0; z-index:101; background:#fff; border:1px solid #eee; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:14px; }
+  .pill{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#f3f4f6; border:1px solid #e5e7eb; font-size:.875rem; }
+  .result-empty{ border:1px dashed #ddd; border-radius:var(--radius); padding:28px; text-align:center; color:#666; }
+  .btn-toggle{ border:1px solid #e5e7eb; background:#fff; }
+  .btn-toggle.active{ background:#111; color:#fff; }
+  .badge-soft{ background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; padding:.25rem .5rem; border-radius:999px; font-size:.75rem; }
+</style>
+
+<div class="search-page container py-4">
+  <!-- Search + Filters -->
+  <form class="filters-card mb-4" method="get" action="{{ url_for('search') }}" role="search" aria-label="Bộ lọc tìm kiếm">
+    <div class="row g-2 g-md-3 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="q">Từ khóa</label>
+        <input id="q" type="search" name="q" value="{{ q or '' }}" class="form-control form-control-lg" placeholder="Nhập từ khóa…" aria-label="Ô tìm kiếm">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="category">Danh mục</label>
+        <select id="category" class="form-select" name="category">
+          {{ options_for(CATEGORIES, category) }}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="condition">Tình trạng</label>
+        <select id="condition" class="form-select" name="condition">
+          {{ options_for(CONDITIONS, condition) }}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="min_price">Giá từ</label>
+        <input id="min_price" type="number" inputmode="numeric" class="form-control" name="min_price" value="{{ min_price or '' }}" placeholder="0">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="max_price">Đến</label>
+        <input id="max_price" type="number" inputmode="numeric" class="form-control" name="max_price" value="{{ max_price or '' }}" placeholder="">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="sort">Sắp xếp</label>
+        <select id="sort" class="form-select" name="sort">
+          <option value="newest" {% if sort=='newest' %}selected{% endif %}>Mới nhất</option>
+          <option value="price_asc" {% if sort=='price_asc' %}selected{% endif %}>Giá tăng dần</option>
+          <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Giá giảm dần</option>
+          <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>Cũ nhất</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2 d-grid">
+        <button class="btn btn-dark btn-lg" type="submit"><i class="fa fa-search me-1"></i> Tìm</button>
+      </div>
+    </div>
+
+    <!-- Active filters pills -->
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      {% if category %}<span class="pill">Danh mục: <strong>{{ label_from(CATEGORIES, category) }}</strong></span>{% endif %}
+      {% if condition %}<span class="pill">Tình trạng: <strong>{{ label_from(CONDITIONS, condition) }}</strong></span>{% endif %}
+      {% if min_price %}<span class="pill">Giá từ: <strong>{{ min_price }}</strong></span>{% endif %}
+      {% if max_price %}<span class="pill">Đến: <strong>{{ max_price }}</strong></span>{% endif %}
+      {% if q %}<span class="pill">Từ khóa: <strong>“{{ q }}”</strong></span>{% endif %}
+      {% if category or condition or min_price or max_price or q %}
+        <a class="btn btn-sm btn-outline-secondary ms-auto" href="{{ url_for('search') }}">Xóa bộ lọc</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Quick suggestions (url đã build sẵn ở backend) -->
+  {% if quick_suggestions and quick_suggestions|length %}
+  <div class="mb-3">
+    <div class="small text-muted mb-1">Gợi ý nhanh:</div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for s in quick_suggestions %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ s.url }}">{{ s.title }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Header: result count + view toggles -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="small">
+      {% if results and results|length %}
+        <strong>{{ results|length }}</strong> kết quả{% if q %} cho <em>“{{ q }}”</em>{% endif %}.
+      {% else %}
+        {% if q %}
+          Không tìm thấy kết quả cho <em>“{{ q }}”</em>.
+        {% else %}
+          Nhập từ khóa để bắt đầu tìm kiếm.
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="d-none d-md-flex align-items-center gap-2">
+      <a class="btn btn-toggle active" href="#"><i class="fa fa-th-large me-1"></i> Lưới</a>
+    </div>
+  </div>
+
+  {% if results and results|length %}
+  <!-- Results grid -->
+  <div class="row g-3 g-md-4">
+    {% for item in results %}
+      <div class="col-12 col-sm-6 col-lg-4">
+        <a href="{{ item.url or '#' }}" class="text-decoration-none text-reset" aria-label="Mở mục {{ item.name or 'không tên' }}" title="{{ item.name }}">
+          <div class="card h-100 shadow-sm card-hover result-card">
+            <div class="ratio-16x9">
+              {% if item.image_url %}
+                <img src="{{ item.image_url }}" alt="{{ (item.name or 'Hình ảnh')|e }}" loading="lazy" class="object-cover">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center text-muted">Không có hình</div>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <h5 class="card-title mb-1 line-clamp-2">{{ item.name or 'Chưa đặt tên' }}</h5>
+
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="uploader">Đăng bởi <span class="fw-semibold">{{ item.uploader_name or 'N/A' }}</span></div>
+              </div>
+
+              {% if item.intro %}
+                <p class="card-text mb-2 line-clamp-3">{{ item.intro }}</p>
+              {% endif %}
+
+              {% if item.caption %}
+                <div class="d-flex flex-wrap gap-2">
+                  {% for chip in item.caption.split('·') %}
+                    <span class="badge-soft">{{ chip.strip() }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <!-- Empty state -->
+    <div class="result-empty">
+      <div class="mb-2"><i class="fa fa-search"></i></div>
+      <div>Không có kết quả phù hợp. Hãy thử từ khóa khác hoặc nới lỏng bộ lọc.</div>
+    </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if pagination %}
+  <nav class="mt-4" aria-label="Phân trang kết quả">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.prev_url %}disabled{% endif %}">
+        <a class="page-link" href="{{ pagination.prev_url or '#' }}" aria-label="Trang trước">&laquo;</a>
+      </li>
+      {% for p in pagination.pages %}
+        <li class="page-item {% if p.active %}active{% endif %}"><a class="page-link" href="{{ p.url }}">{{ p.number }}</a></li>
+      {% endfor %}
+      <li class="page-item {% if not pagination.next_url %}disabled{% endif %}">
+        <a class="page-link" href="{{ pagination.next_url or '#' }}" aria-label="Trang sau">&raquo;</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

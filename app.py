@@ -1,6 +1,7 @@
+
 from flask import (
     Flask, render_template, redirect, url_for, flash,
-    request, session, abort, send_from_directory, jsonify
+    request, session, abort, send_from_directory, jsonify   # thêm jsonify
 )
 
 from flask_wtf import FlaskForm
@@ -25,8 +26,6 @@ import mysql.connector
 from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
-
-
 from openai import OpenAI
 from decimal import Decimal
 from dotenv import load_dotenv
@@ -84,11 +83,10 @@ def chatbot():
                 {"role": "user", "content": user_message}
             ]
         )
-        reply = response.choices[0].message.content if response.choices else "⚠️ Không có phản hồi."
-        return jsonify({"reply": str(reply)})
+        reply = response.choices[0].message.content
+        return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # ===================== App & Config =====================
 
@@ -172,6 +170,34 @@ app.config.update(
 )
 
 
+# ===================== API Suggest =====================
+@app.route("/api/suggest")
+def api_suggest():
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return {"suggestions": []}
+
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute("""
+            SELECT id, title, price, location, cover_image
+            FROM listings
+            WHERE status='active' AND (title LIKE %s OR location LIKE %s)
+            ORDER BY id DESC
+            LIMIT 10
+        """, (f"%{q}%", f"%{q}%"))
+        rows = cur.fetchall()
+
+    suggestions = [
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "price": r["price"],
+            "location": r.get("location"),
+            "cover": url_for("uploaded_file", filename=r["cover_image"]) if r.get("cover_image") else None
+        }
+        for r in rows
+    ]
+    return {"suggestions": suggestions}
 
 
 # ===================== MySQL (XAMPP) =====================
