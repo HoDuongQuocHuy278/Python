@@ -26,67 +26,7 @@ import mysql.connector
 from mysql.connector import Error
 from contextlib import closing
 from functools import wraps
-from openai import OpenAI
-from decimal import Decimal
-from dotenv import load_dotenv
 
-load_dotenv()  # đọc file .env
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# =========================================================
-# Flask app & OpenAI
-# =========================================================
-app = Flask(__name__)
-# Secret key + session config
-app.config["SECRET_KEY"] = "dev-secret-key-change-me"
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-)
-
-# Upload
-BASE_DIR = Path(app.root_path)
-INSTANCE_DIR = Path(app.instance_path)
-MEDIA_DIR = INSTANCE_DIR / "uploads"
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-app.config["MEDIA_ROOT"] = str(MEDIA_DIR)
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
-ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"]
-
-# DB config
-DB_CONFIG = dict(
-    host="localhost",
-    user="root",
-    password="",
-    database="user_manager",
-    auth_plugin="mysql_native_password",
-)
-
-def get_conn():
-    return mysql.connector.connect(**DB_CONFIG)
-
-# =========================================================
-# Chatbot API
-# =========================================================
-@app.route("/chatbot", methods=["POST"])
-def chatbot():
-    try:
-        data = request.get_json(force=True)
-        user_message = data.get("message", "")
-        if not user_message:
-            return jsonify({"reply": "⚠️ Bạn chưa nhập tin nhắn."})
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Bạn là chatbot hỗ trợ người dùng."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        reply = response.choices[0].message.content
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 # ===================== App & Config =====================
 
@@ -114,10 +54,9 @@ def ensure_media_root():
             print("MEDIA candidate failed:", p, "=>", e)
     raise RuntimeError("No writable MEDIA_ROOT found")
 
-MEDIA_DIR = ensure_media_root()
+ MEDIA_DIR = ensure_media_root()
 ALLOWED_EXTS = ["jpg","jpeg","png","webp"]
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5MB
-
 MEDIA_DIR = ensure_media_root()
 
 def _save_image(file_storage):
