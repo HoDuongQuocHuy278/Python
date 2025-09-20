@@ -146,5 +146,23 @@ footer {
   margin-top: 20px;
 }
 
+
+/* chức năng */
+
+
+.cat-card {
+  text-align: center;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px 8px;
+  transition: 0.2s;
+}
+.cat-card:hover {
+  background: #f9fafb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.cat-ico {
+  font-size: 2rem;
+}
 /* Navbar polish (tùy chọn) */
 .navbar { backdrop-filter: saturate(140%) blur(6px); }

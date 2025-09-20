@@ -121,14 +121,60 @@ def get_conn():
     """Mở connection tới MySQL theo DB_CONFIG."""
     return mysql.connector.connect(**DB_CONFIG)
 
+# ================== HÀM NẠP DANH MỤC ==================
+def load_categories():
+    """
+    Lấy toàn bộ categories từ DB, trả về list[dict] dạng:
+    [
+      {"icon": "📚", "name": "Sách", "slug": "book"},
+      {"icon": "👗", "name": "Thời trang nữ", "slug": "fashion_women"},
+      ...
+      
+    ]
+    """
+    sql = "SELECT icon, name, key_name AS slug FROM categories ORDER BY id ASC"
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute(sql)
+        rows = cur.fetchall() or []
+
+    CATEGORIES = [
+        {"icon": r["icon"], "name": r["name"], "slug": r["slug"]}
+        for r in rows
+    ]
+    return CATEGORIES
+
+def load_category_maps(*, value="name"):
+    """
+    Trả về 2 cấu trúc tiện dùng:
+    - cat_list: list[(value, label)] cho SelectField (value = 'name' hoặc 'slug')
+    - cat_map:  dict {value: label} cho macro options_for/label_from
+    """
+    sql = "SELECT name, key_name FROM categories ORDER BY id ASC"
+    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
+        cur.execute(sql)
+        rows = cur.fetchall() or []
+
+    if value == "slug":
+        cat_list = [(r["key_name"], r["name"]) for r in rows]
+        cat_map  = {r["key_name"]: r["name"] for r in rows}
+    else:  # value = "name" (mặc định)
+        cat_list = [(r["name"], r["name"]) for r in rows]
+        cat_map  = {r["name"]: r["name"] for r in rows}
+    return cat_list, cat_map
+
 # ===================== WTForms =====================
 
-CATEGORIES = [
-    ("Sách","Sách"), ("Thời trang nữ","Thời trang nữ"), ("Thời trang nam","Thời trang nam"),
-    ("Mẹ & bé","Mẹ & bé"), ("Đồ chơi","Đồ chơi"), ("Xe cộ","Xe cộ"),
-    ("Đồ gia dụng","Đồ gia dụng"), ("Giày dép","Giày dép"),
-    ("Đồ điện tử","Đồ điện tử"), ("Thú cưng","Thú cưng"),
-]
+def load_categories_for_form():
+    """
+    Trả về list[(value, label)] cho WTForms SelectField.
+    Ở đây dùng cột `name` tiếng Việt làm cả value và label để bạn lưu thẳng tên vào listings.category.
+    Nếu bạn muốn lưu slug, đổi SELECT cho lấy key_name và map (key_name, name).
+    """
+    sql = "SELECT name FROM categories ORDER BY id ASC"
+    with closing(get_conn()) as conn, closing(conn.cursor()) as cur:
+        cur.execute(sql)
+        rows = cur.fetchall() or []
+    return [(r[0], r[0]) for r in rows]  # [(value, label)]
 CONDITIONS = [
     ("new","Mới 100%"),
     ("like_new","Như mới"),
@@ -151,7 +197,7 @@ class SellForm(FlaskForm):
     description = TextAreaField("Mô tả chi tiết", validators=[DataRequired(), Length(min=10, max=5000)])
     price = DecimalField("Giá (VND)", places=0, rounding=None,
                          validators=[DataRequired(), NumberRange(min=0)])
-    category = SelectField("Danh mục", choices=CATEGORIES, validators=[DataRequired()])
+    category = SelectField("Danh mục",  choices=[], coerce=str, validators=[DataRequired()])
     condition_level = SelectField("Tình trạng", choices=CONDITIONS, validators=[DataRequired()])
     location = StringField("Khu vực", validators=[Optional(), Length(max=100)])
     image = FileField("Ảnh bìa (jpg/png/webp)",
@@ -214,10 +260,13 @@ def inject_user():
 @app.route("/")
 def home():
     u = session.get("user")
-    if not u:
-        # khách chưa đăng nhập vẫn xem marketplace
-        return render_template("home.html", title="Trao đổi đồ cũ")
-    return render_template("home.html", title="Trao đổi đồ cũ")
+    cats = load_categories()  # nạp dữ liệu từ DB
+    return render_template(
+        "home.html",
+        title="Trao đổi đồ cũ",
+        cats=cats,
+        user=u
+    )
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -421,6 +470,12 @@ def sell():
     """
     form = SellForm()
 
+    # ★ NẠP DANH MỤC TỪ SQL CHO SELECTFIELD
+    form.category.choices = load_categories_for_form()
+    if not form.category.choices:
+        # fallback để không lỗi validate nếu DB đang rỗng
+        form.category.choices = [("", "-- Chưa có danh mục --")]
+
     if form.validate_on_submit():
         # Lấy dữ liệu form
         title = form.title.data.strip()
@@ -438,17 +493,12 @@ def sell():
             flash("Giá không hợp lệ.", "warning")
             return render_template("sell.html", form=form)
 
-        category = form.category.data
+        category = form.category.data              # ★ giờ lấy từ SQL
         condition_level = form.condition_level.data
         location = (form.location.data or "").strip() or None
 
         # LƯU ẢNH BÌA — chỉ gọi MỘT lần
         cover_path = _save_image(form.image.data)
-        print("MEDIA_ROOT =", app.config["MEDIA_ROOT"])
-        print("filename  ->", getattr(form.image.data, "filename", None))
-        print("saved as  ->", cover_path)
-
-        # Debug kiểm tra nhanh
         print("MEDIA_ROOT =", app.config["MEDIA_ROOT"])
         print("filename  ->", getattr(form.image.data, "filename", None))
         print("saved as  ->", cover_path)
@@ -473,10 +523,10 @@ def sell():
                             title,
                             description,
                             str(price),
-                            category,
+                            category,          # ★ lưu đúng theo value đã chọn
                             condition_level,
                             location,
-                            cover_path,  # tên file (có thể None nếu không chọn ảnh)
+                            cover_path,
                         ),
                     )
                     conn.commit()
@@ -493,6 +543,17 @@ def sell():
 
     # GET hoặc lỗi -> render lại form
     return render_template("sell.html", form=form)
+
+
+def get_category_choices():
+    sql = "SELECT key_name, name FROM categories ORDER BY id"
+    with closing(get_conn()) as conn, closing(conn.cursor()) as cur:
+        cur.execute(sql)
+        rows = cur.fetchall() or []
+    # WTForms SelectField expects [(value, label), ...]
+    return [(r[0], r[1]) for r in rows]
+
+
 @app.route("/my/listings")
 @login_required
 def my_listings():
@@ -509,7 +570,7 @@ def my_listings():
 
 
 @app.route("/listing/<int:id>")
-def listing_detail(ld):
+def listing_detail(id):
     """Trang chi tiết 1 tin đăng (ai cũng xem được trừ khi tin bị ẩn)."""
     with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
         cur.execute("""
@@ -525,51 +586,69 @@ def listing_detail(ld):
         flash("Tin đăng không tồn tại hoặc đã ẩn.", "warning")
         return redirect(url_for("home"))
     return render_template("listing_detail.html", item=item)
-
+class ListingForm(FlaskForm):
+    category = SelectField("Danh mục", choices=[], coerce=str)
 # tìm kiếm 
 
 @app.route("/api/suggest")
 def api_suggest():
     term = (request.args.get("q") or request.args.get("term") or "").strip()
     items = []
+    if not term:
+        return jsonify({"query": term, "items": items})
 
-    if term:
-        t = term.lower()
-        # Ưu tiên gợi ý danh mục khớp
-        for val, label in CATEGORIES:
-            if t in val.lower() or t in label.lower():
-                items.append({
-                    "type": "category",
-                    "label": label,
-                    "url": url_for("search", category=val, q=term)
-                })
-                if len(items) >= 4:
-                    break
+    # ----- Gợi ý theo danh mục (value = name) -----
+    try:
+        cat_list, _ = load_category_maps(value="name")  # [(name, name)]
+    except Exception:
+        cat_list = []
+    t = term.lower()
+    for val, label in cat_list:
+        if t in val.lower() or t in label.lower():
+            items.append({
+                "type": "category",
+                "label": label,
+                "url": url_for("search", category=val, q=term)
+            })
+            if len(items) >= 4:
+                break
 
-    # Gợi ý tiêu đề tin
-    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
-        like = f"%{term}%"
-        cur.execute("""
-            SELECT id, title
-            FROM listings
-            WHERE status='active' AND title LIKE %s
-            ORDER BY id DESC
-            LIMIT 8
-        """, (like,))
-        rows = cur.fetchall()
+    # ----- Gợi ý tiêu đề/mô tả/danh mục: KHÔNG phân biệt hoa-thường & dấu -----
+    COLL = "utf8mb4_0900_ai_ci"  # dùng MySQL 8; nếu không có, thay bằng utf8mb4_unicode_ci
+    with closing(get_conn()) as conn:
+        try:
+            conn.set_charset_collation('utf8mb4', 'utf8mb4_unicode_ci')
+        except Exception:
+            pass
+        with closing(conn.cursor(dictionary=True)) as cur:
+            like = f"%{term}%"  # không cần .lower() vì đã COLLATE
+            cur.execute(f"""
+                SELECT id, title
+                FROM listings
+                WHERE status='active' AND (
+                    title    COLLATE {COLL} LIKE %s OR
+                    description COLLATE {COLL} LIKE %s OR
+                    category COLLATE {COLL} LIKE %s
+                )
+                ORDER BY id DESC
+                LIMIT 8
+            """, (like, like, like))
+            rows = cur.fetchall() or []
+
     for r in rows:
         items.append({
             "type": "listing",
             "id": r["id"],
             "label": r["title"],
-            "url": url_for("listing_detail", lid=r["id"])
+            "url": url_for("listing_detail", id=r["id"])
         })
 
     return jsonify({"query": term, "items": items[:10]})
+# --------------tìm kiếm-----------------------
+
 
 @app.get("/search")
 def search():
-    # ---- 1) Lấy params & chuẩn hóa ----
     q            = (request.args.get("q") or "").strip()
     category     = (request.args.get("category") or "").strip() or None
     cond         = (request.args.get("condition") or "").strip() or None
@@ -579,46 +658,46 @@ def search():
     page         = request.args.get("page", 1, type=int)
     per_page     = request.args.get("per_page", 24, type=int)
     page         = max(page, 1)
-    per_page     = max(min(per_page, 60), 1)  # giới hạn 1..60/ trang
+    per_page     = max(min(per_page, 60), 1)
 
     def parse_decimal(s):
-        try:
-            return Decimal(s) if s else None
-        except Exception:
-            return None
+        try: return Decimal(s) if s else None
+        except Exception: return None
 
     min_price = parse_decimal(min_price_s)
     max_price = parse_decimal(max_price_s)
 
-    # ---- 2) WHERE & PARAMS ----
     base_from = """
       FROM listings l
       LEFT JOIN users u ON u.id = l.user_id
       WHERE l.status = 'active'
     """
-    where = []
-    params = []
+    where, params = [], []
 
     if q:
-        where.append("(l.title LIKE %s OR l.description LIKE %s OR l.location LIKE %s)")
+        # Dò title/description/location/category – không cần LOWER/COLLATE vì cột đã utf8mb4_unicode_ci
+        where.append("("
+                     "l.title LIKE %s OR "
+                     "l.description LIKE %s OR "
+                     "l.location LIKE %s OR "
+                     "l.category LIKE %s"
+                     ")")
         like = f"%{q}%"
-        params += [like, like, like]
+        params += [like, like, like, like]
+
     if category:
         where.append("l.category = %s")
         params.append(category)
+
     if cond:
-        where.append("l.condition_level = %s")
-        params.append(cond)
+        where.append("l.condition_level = %s"); params.append(cond)
     if min_price is not None:
-        where.append("l.price >= %s")
-        params.append(min_price)
+        where.append("l.price >= %s"); params.append(min_price)
     if max_price is not None:
-        where.append("l.price <= %s")
-        params.append(max_price)
+        where.append("l.price <= %s"); params.append(max_price)
 
     where_sql = (" AND ".join(where)) if where else "1=1"
 
-    # ---- 3) ORDER BY ----
     ORDER_BY = {
         "newest":     "l.created_at DESC",
         "oldest":     "l.created_at ASC",
@@ -627,27 +706,17 @@ def search():
     }
     order_by = ORDER_BY.get(sort, ORDER_BY["newest"])
 
-    # ---- 4) Đếm tổng bản ghi cho phân trang ----
-    count_sql = f"""
-      SELECT COUNT(*) AS total
-      {base_from} AND {where_sql}
-    """
-
-    # ---- 5) Trang hiện tại + OFFSET/LIMIT ----
+    count_sql = f"SELECT COUNT(*) AS total {base_from} AND {where_sql}"
     offset = (page - 1) * per_page
-
-    # ---- 6) Câu lệnh chính lấy dữ liệu ----
     data_sql = f"""
       SELECT
         l.id, l.title, l.price, l.status, l.created_at,
         l.cover_image, l.category, l.condition_level, l.location,
-        u.fullname AS uploader_name  
+        u.fullname AS uploader_name
       {base_from} AND {where_sql}
       ORDER BY {order_by}
       LIMIT %s OFFSET %s
     """
-
-    # ---- 7) Lấy gợi ý nhanh (lên đầu trang) ----
     suggest_sql = f"""
       SELECT l.id, l.title
       {base_from} AND {where_sql}
@@ -655,44 +724,48 @@ def search():
       LIMIT 8
     """
 
-    # ---- 8) Thực thi ----
-    with closing(get_conn()) as conn, closing(conn.cursor(dictionary=True)) as cur:
-        # count
-        cur.execute(count_sql, params)
-        total = cur.fetchone()["total"] if cur.rowcount is not None else 0
-
-        # data
-        cur.execute(data_sql, params + [per_page, offset])
-        rows = cur.fetchall()
-
-        # suggestions
-        cur.execute(suggest_sql, params)
-        quick_suggestions = cur.fetchall()
-
-    # ---- 9) Map rows -> results theo định dạng search.html ----
-    def fmt_price(v):
+    with closing(get_conn()) as conn:
         try:
-            return f"{Decimal(v):,.0f}₫"
+            conn.set_charset_collation('utf8mb4', 'utf8mb4_unicode_ci')
         except Exception:
-            return str(v) if v is not None else ""
+            pass
+        with closing(conn.cursor(dictionary=True)) as cur:
+            cur.execute(count_sql, params)
+            total = cur.fetchone()["total"] if cur.rowcount is not None else 0
+            cur.execute(data_sql, params + [per_page, offset])
+            rows = cur.fetchall()
+            cur.execute(suggest_sql, params)
+            quick_suggestions = cur.fetchall()
+
+    try:
+        _, cat_map = load_category_maps(value="name")
+    except Exception:
+        try: cat_map = dict(load_categories_for_form())
+        except Exception: cat_map = {}
+
+    def to_image_url(name):
+        if not name: return url_for("static", filename="img/placeholder.png")
+        import os
+        return url_for("uploaded_file", filename=os.path.basename(name))
+
+    def fmt_price(v):
+        try: return f"{Decimal(v):,.0f}₫"
+        except Exception: return str(v) if v is not None else ""
 
     results = []
     for r in rows:
-        # caption ghép từ category + condition (nếu có dict map)
-        cat_label = (CATEGORIES.get(r["category"]) if hasattr(CATEGORIES, "get") else r["category"]) or "Khác"
-        cond_label = (CONDITIONS.get(r["condition_level"]) if hasattr(CONDITIONS, "get") else r["condition_level"]) or ""
-        caption = f"{cat_label}" + (f" · {cond_label}" if cond_label else "")
-
+        cat_label  = cat_map.get(r["category"]) or r["category"] or "Khác"
+        cond_label = dict(CONDITIONS).get(r["condition_level"], r["condition_level"]) or ""
+        caption    = f"{cat_label}" + (f" · {cond_label}" if cond_label else "")
         results.append({
             "url": url_for("listing_detail", id=r["id"]) if "listing_detail" in app.view_functions else f"/listing/{r['id']}",
-            "image_url": r["cover_image"] or url_for("static", filename="img/placeholder.png"),
+            "image_url": to_image_url(r.get("cover_image")),
             "name": r["title"] or f"Mục #{r['id']}",
             "intro": " · ".join([s for s in [(r.get("location") or "").strip(), fmt_price(r.get("price"))] if s]),
             "caption": caption,
             "uploader_name": r.get("uploader_name") or "Ẩn danh",
         })
 
-    # ---- 10) Xây pagination object cho template ----
     total_pages = (total + per_page - 1) // per_page if per_page else 1
     total_pages = max(total_pages, 1)
     page = min(page, total_pages)
@@ -703,29 +776,23 @@ def search():
         args["per_page"] = per_page
         return url_for("search", **args)
 
-    # tạo dải trang (ví dụ hiển thị tối đa 7 nút)
-    window = 7
-    half = window // 2
-    start = max(page - half, 1)
-    end = min(start + window - 1, total_pages)
+    window = 7; half = window // 2
+    start = max(page - half, 1); end = min(start + window - 1, total_pages)
     start = max(min(start, max(1, end - window + 1)), 1)
-
     pages = [{"number": i, "url": build_url(i), "active": (i == page)} for i in range(start, end + 1)]
-
     pagination = {
         "prev_url": build_url(page - 1) if page > 1 else None,
         "next_url": build_url(page + 1) if page < total_pages else None,
         "pages": pages,
     }
 
-    # ---- 11) Render ----
     return render_template(
         "search.html",
         q=q,
         results=results,
         pagination=pagination,
-        quick_suggestions=quick_suggestions,  # nếu muốn hiển thị, thêm block Jinja trong template
-        CATEGORIES=CATEGORIES,
+        quick_suggestions=quick_suggestions,
+        CATEGORIES=cat_map,
         CONDITIONS=CONDITIONS,
         category=category,
         condition=cond,
@@ -733,6 +800,7 @@ def search():
         max_price=max_price_s,
         sort=sort,
     )
+
 # ===================== Main =====================
 if __name__ == "__main__":
     # Nhớ Start Apache + MySQL trong XAMPP trước khi chạy

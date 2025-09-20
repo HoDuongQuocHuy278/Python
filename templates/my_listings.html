@@ -26,7 +26,7 @@
             {{ "{:,.0f}đ".format((r.price|float)) }}
           </div>
           <div class="small text-muted">Trạng thái: {{ r.status }} · {{ r.created_at }}</div>
-          <a class="stretched-link" href="{{ url_for('listing_detail', lid=r.id) }}"></a>
+          <a class="stretched-link" href="{{ url_for('listing_detail', id=r.id) }}"></a>
         </div>
       </div>
     </div>

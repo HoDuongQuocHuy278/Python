@@ -67,16 +67,11 @@
     </div>
 
     <div class="row g-3">
-      {% set cats = [
-        ('📚','Sách'), ('👗','Thời trang nữ'), ('👕','Thời trang nam'), ('🍼','Mẹ & Bé'),
-        ('🧸','Đồ chơi'), ('🚗','Xe cộ'), ('🏠','Đồ gia dụng'), ('👟','Giày dép'),
-        ('💻','Đồ điện tử'), ('🐶','Thú cưng')
-      ] %}
-      {% for icon, name in cats %}
+      {% for c in cats %}
       <div class="col-6 col-md-4 col-lg-2">
-        <a class="cat-card d-block text-reset" href="#">
-          <div class="cat-ico">{{ icon }}</div>
-          <div class="fw-semibold mt-1">{{ name }}</div>
+        <a class="cat-card d-block text-reset" href="{{ url_for('search', category=c.slug) }}">
+          <div class="cat-ico">{{ c.icon }}</div>
+          <div class="fw-semibold mt-1">{{ c.name }}</div>
         </a>
       </div>
       {% endfor %}

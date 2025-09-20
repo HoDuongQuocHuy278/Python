@@ -171,8 +171,9 @@
         <a href="{{ item.url or '#' }}" class="text-decoration-none text-reset" aria-label="Mở mục {{ item.name or 'không tên' }}" title="{{ item.name }}">
           <div class="card h-100 shadow-sm card-hover result-card">
             <div class="ratio-16x9">
-              {% if item.image_url %}
-                <img src="{{ item.image_url }}" alt="{{ (item.name or 'Hình ảnh')|e }}" loading="lazy" class="object-cover">
+         
+                {% if item.image_url %}
+                <img class="card-img-top" src="{{ media_url(item.image_url) }}" alt="Ảnh">
               {% else %}
                 <div class="d-flex align-items-center justify-content-center text-muted">Không có hình</div>
               {% endif %}

@@ -31,7 +31,9 @@
     <div class="col-md-4">
       <label class="form-label">{{ form.category.label }}</label>
       {{ form.category(class="form-select") }}
-      {% for e in form.category.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      {% for e in form.category.errors %}
+        <div class="text-danger small">{{ e }}</div>
+      {% endfor %}
     </div>
 
     <div class="col-md-4">
